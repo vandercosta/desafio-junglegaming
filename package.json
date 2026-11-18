@@ -12,7 +12,9 @@
     "test:e2e": "playwright test",
     "audit:lighthouse": "lighthouse",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "dev:mocks": "vite --mode demo",
+    "build:demo": "npm run build -- --mode demo"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
