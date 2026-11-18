@@ -11,7 +11,7 @@ const root = createRoot(document.getElementById('root')!)
 async function bootstrap() {
   if (import.meta.env.VITE_ENABLE_MOCKS === 'true') {
     const { worker } = await import('./mocks/browser')
-    await worker.start()
+    await worker.start({ quiet: true })
   }
 
   root.render(

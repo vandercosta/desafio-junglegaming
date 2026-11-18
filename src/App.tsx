@@ -3,9 +3,10 @@ import { Button } from '@/components/ui/button'
 import { listNfts } from '@/features/catalog/catalog-api'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import CatalogFilters from '@/features/catalog/catalog-filters'
+import { parseCatalogSearch } from '@/features/catalog/catalog-search'
 
 export default function App() {
-  const search = useSearch({ from: '/' })
+  const search = useSearch({ from: '/', select: parseCatalogSearch })
   const navigate = useNavigate({ from: '/' })
   const page = search.page ?? 1
 

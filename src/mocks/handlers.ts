@@ -7,6 +7,7 @@ import {
 import { nfts, nftEditions } from './fixtures/nfts'
 import { toWei } from '@/lib/eth'
 import { cartHandlers } from './cart-handlers'
+import { authHandlers } from './auth-handlers'
 
 const PAGE_SIZE = 3
 
@@ -108,4 +109,5 @@ export const handlers = [
     })
   }),
   ...cartHandlers,
+  ...authHandlers,
 ]

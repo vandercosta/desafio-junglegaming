@@ -1,6 +1,6 @@
 # Kurio — Marketplace de NFTs
 
-Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Kurio permite explorar um catálogo de NFTs, consultar os detalhes de uma obra e adicionar edições ao carrinho de visitante. Os dados deste fluxo são servidos por uma API REST simulada com Mock Service Worker.
+Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Kurio permite explorar um catálogo de NFTs, consultar os detalhes de uma obra, gerenciar um carrinho de visitante e entrar com uma conta de demonstração. Os dados são servidos por uma API REST simulada com Mock Service Worker.
 
 [Enunciado do desafio](https://github.com/junglegaming/frontend-challenge) · [Layout no Figma](https://www.figma.com/design/Ff0SksUi7UFtPWUO8kyNtw/Frontend-Challenge?node-id=0-1)
 
@@ -11,9 +11,10 @@ Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Ku
 - Carrinho de visitante com inclusão, alteração de quantidade, remoção e persistência após atualizar a página.
 - Cotação do carrinho pela API simulada, com subtotal, desconto, taxa de rede e total. O cupom aplicado é mantido após atualizar a página.
 - Remoção otimista no carrinho. A linha some enquanto a solicitação está pendente e reaparece se a API rejeitar a operação.
+- Login e logout simulados, com recuperação da sessão após atualizar a página e aviso de expiração. O diálogo de login preserva a rota e os filtros atuais.
 - Estados de carregamento, lista vazia, erro e recurso inexistente.
 
-A próxima etapa é a autenticação, com cadastro, login, logout e preservação do carrinho de visitante ao entrar. Favoritos, perfil, carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
+A próxima etapa é o cadastro de colecionadores, seguido da integração da sessão com o carrinho por conta. Favoritos, perfil, carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
 
 ## Tecnologias
 
@@ -61,6 +62,27 @@ O preview geralmente fica em `http://localhost:4173`. O Vite incorpora as variá
 
 Um exemplo de URL compartilhável do catálogo é `/?q=Golden&collection=musica&sort=price-asc`. Você pode atualizar a página ou usar o histórico do navegador para recuperar os valores aplicados.
 
+## Autenticação simulada
+
+Use uma destas contas fictícias no modo `demo`.
+
+| Conta      | E-mail                     | Senha de demonstração |
+| ---------- | -------------------------- | --------------------- |
+| Ana Demo   | `ana@kurio.example.test`   | `Kurio-Ana!2026`      |
+| Bruno Demo | `bruno@kurio.example.test` | `Kurio-Bruno!2026`    |
+
+1. Abra `/nfts/0042?q=Golden&page=2` e clique em **Entrar**. O diálogo abre na rota atual com `auth=entrar` na URL.
+2. Entre com uma das contas. O cabeçalho mostra o nome da conta e a opção **Sair**. O diálogo fecha e a URL preserva o NFT, a busca e a página.
+3. Atualize a página para conferir a recuperação da sessão. Use **Sair** para encerrá-la e testar a segunda conta.
+
+O MSW verifica as senhas com PBKDF2 e salt. A sessão simulada dura 30 minutos, e o armazenamento local guarda o ID do usuário e a expiração. O carrinho de visitante permanece no navegador ao entrar ou sair.
+
+### Reproduzir uma falha de login ou uma sessão expirada
+
+Para testar credenciais inválidas, use um dos e-mails da tabela com uma senha diferente. A interface mostra **E-mail ou senha incorretos.** e permite reenviar o formulário.
+
+Para simular expiração manualmente, entre com uma conta, abra o armazenamento local no DevTools e altere `expiresAt` para `0` no valor da chave `kurio:mock-session:v1`. Ao atualizar a página, a interface mostra **Sua sessão expirou. Entre novamente.** O teste automatizado reproduz esse comportamento avançando o relógio do navegador.
+
 ## Cenários da API simulada
 
 | Variável               | Valor   | Comportamento                                             |
@@ -106,31 +128,35 @@ VITE_MOCK_CART_EDITS=error npm run dev:mocks
 5. Experimente `INVALIDO` ou `EXPIRADO10`. A API rejeita cada código com HTTP `422` e mantém o cupom aplicado. A interface informa se o código é inválido ou expirou.
 6. Clique em **Remover cupom** para voltar ao total de `2,396 ETH`.
 
-### Restaurar o cenário padrão e limpar o carrinho
+### Restaurar o cenário padrão e limpar os dados
 
 Para restaurar as respostas padrão, reinicie o servidor com `npm run dev:mocks`, sem as variáveis de cenário.
 
-O mock guarda as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Para apagar os dois e voltar ao carrinho vazio, execute no console do navegador:
+O mock guarda a sessão, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. O trecho abaixo encerra a sessão e esvazia o carrinho quando executado no console do navegador.
 
 ```js
 localStorage.removeItem('kurio:guest-cart:v1')
+localStorage.removeItem('kurio:mock-session:v1')
 location.reload()
 ```
 
-O servidor de desenvolvimento e o preview usam portas diferentes. Limpe a chave na origem que estiver usando.
+O servidor de desenvolvimento e o preview usam portas diferentes. Limpe as chaves na origem que estiver usando.
 
 ## Contratos REST atuais
 
-| Método   | Endpoint                  | Comportamento                                                                                                                |
-| -------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/api/nfts`               | Lista NFTs. Aceita `q`, `collection`, `network`, `minEth`, `maxEth`, `sort` e `page`. Retorna `items`, `total` e `pageSize`. |
-| `GET`    | `/api/nfts/:nftId`        | Retorna o detalhe e o estoque por edição. Um ID inexistente retorna HTTP `404` com o código `NFT_NOT_FOUND`.                 |
-| `GET`    | `/api/cart`               | Retorna os itens e a cotação do carrinho de visitante, com subtotal, desconto, taxa de rede e total.                         |
-| `POST`   | `/api/cart/items`         | Recebe `nftId`, `editionId` e `quantity`. Soma à quantidade quando já existe uma linha para o mesmo NFT e edição.            |
-| `PATCH`  | `/api/cart/items/:itemId` | Recebe `{ quantity }` e define a quantidade final da linha.                                                                  |
-| `DELETE` | `/api/cart/items/:itemId` | Remove a linha e retorna o carrinho atualizado.                                                                              |
-| `PUT`    | `/api/cart/coupon`        | Recebe `{ code }`, aplica o cupom válido e retorna o carrinho com a cotação atualizada.                                      |
-| `DELETE` | `/api/cart/coupon`        | Remove o cupom e retorna o carrinho com a cotação atualizada.                                                                |
+| Método   | Endpoint                  | Comportamento                                                                                                                                                                   |
+| -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/nfts`               | Lista NFTs. Aceita `q`, `collection`, `network`, `minEth`, `maxEth`, `sort` e `page`. Retorna `items`, `total` e `pageSize`.                                                    |
+| `GET`    | `/api/nfts/:nftId`        | Retorna o detalhe e o estoque por edição. Um ID inexistente retorna HTTP `404` com o código `NFT_NOT_FOUND`.                                                                    |
+| `GET`    | `/api/cart`               | Retorna os itens e a cotação do carrinho de visitante, com subtotal, desconto, taxa de rede e total.                                                                            |
+| `POST`   | `/api/cart/items`         | Recebe `nftId`, `editionId` e `quantity`. Soma à quantidade quando já existe uma linha para o mesmo NFT e edição.                                                               |
+| `PATCH`  | `/api/cart/items/:itemId` | Recebe `{ quantity }` e define a quantidade final da linha.                                                                                                                     |
+| `DELETE` | `/api/cart/items/:itemId` | Remove a linha e retorna o carrinho atualizado.                                                                                                                                 |
+| `PUT`    | `/api/cart/coupon`        | Recebe `{ code }`, aplica o cupom válido e retorna o carrinho com a cotação atualizada.                                                                                         |
+| `DELETE` | `/api/cart/coupon`        | Remove o cupom e retorna o carrinho com a cotação atualizada.                                                                                                                   |
+| `POST`   | `/api/auth/login`         | Recebe `{ email, password }` e retorna a sessão. Dados inválidos retornam HTTP `400` com `INVALID_INPUT`. Credenciais incorretas retornam HTTP `401` com `INVALID_CREDENTIALS`. |
+| `GET`    | `/api/auth/session`       | Retorna a sessão atual ou `{ session: null }`. Sessão expirada retorna HTTP `401` com `SESSION_EXPIRED`.                                                                        |
+| `DELETE` | `/api/auth/session`       | Encerra a sessão e retorna HTTP `204`.                                                                                                                                          |
 
 Cada linha do carrinho representa um par de NFT e edição. O mock persiste os IDs, as quantidades e o código aplicado e consulta as fixtures para montar os preços e o estoque. A cotação é recalculada quando a quantidade, os itens ou o cupom mudam. As quantidades são inteiras. Os valores em ETH trafegam como strings decimais, e os cálculos de preço usam `BigInt` em wei.
 
@@ -139,6 +165,7 @@ Cada linha do carrinho representa um par de NFT e edição. O mock persiste os I
 ```text
 src/
   features/
+    auth/       Cliente REST de sessão, cabeçalho e diálogo de login
     catalog/    Contratos, filtros e tela de detalhe
     cart/       Contrato e tela do carrinho
   lib/          Cliente Axios e conversões de ETH
@@ -154,6 +181,8 @@ O TanStack Query usa os filtros validados como parte da chave da listagem, o ID 
 
 As mutações do carrinho atualizam o cache com a resposta da API. Se uma edição falhar, o carrinho é consultado novamente para reconciliar o estado exibido com o mock.
 
+A sessão usa a chave `['session']`. Após login ou logout, as consultas de sessão pendentes são canceladas e o cache recebe o estado confirmado pela API.
+
 ## Testes e verificações
 
 Instale o navegador usado pelo Playwright:
@@ -168,7 +197,13 @@ Execute os testes:
 npm run test:e2e
 ```
 
-O Playwright inicia o Vite com mocks na porta `4175` e executa os casos em Chromium desktop (`1440 × 900`) e mobile (`390 × 844`). A cobertura atual verifica acesso direto ao detalhe, NFT inexistente, persistência após refresh, adição, alteração de quantidade e remoção no carrinho, recálculo da cotação, aplicação e remoção de cupom e rejeição de cupons inválidos ou expirados.
+O Playwright inicia o Vite com mocks na porta `4175` e executa os casos em Chromium desktop (`1440 × 900`) e mobile (`390 × 844`). A cobertura inclui detalhe e NFT inexistente, carrinho e persistência, recálculo da cotação e cupons. Os testes de autenticação cobrem sessão após atualizar a página, credenciais incorretas, logout, troca de conta, expiração e preservação da URL do NFT ao entrar.
+
+Execute apenas a suíte de autenticação com o comando abaixo.
+
+```bash
+npm run test:e2e -- auth.spec.ts
+```
 
 Abra o relatório HTML com:
 
