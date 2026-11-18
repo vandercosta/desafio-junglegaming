@@ -9,6 +9,25 @@ export type NftSummary = {
   network: NonNullable<CatalogSearch['network']>
 }
 
+export type NftEdition = {
+  id: string
+  label: string
+  availableQuantity: number
+}
+
+export type NftDetail = NftSummary & {
+  description: string
+  collectionName: string
+  attributes: string[]
+  details: {
+    paragraphs: string[]
+    network: string
+    contract: string
+    royalties: string
+  }
+  editions: NftEdition[]
+}
+
 export type NftListResponse = {
   items: NftSummary[]
   total: number
@@ -41,4 +60,42 @@ export async function listNfts(
   }
 
   return data
+}
+
+export async function getNft(
+  nftId: string,
+  signal: AbortSignal,
+): Promise<NftDetail | null> {
+  try {
+    const { data } = await catalogApi.get<NftDetail>(
+      `/nfts/${encodeURIComponent(nftId)}`,
+      { signal },
+    )
+
+    if (
+      data?.id !== nftId ||
+      typeof data.description !== 'string' ||
+      typeof data.collectionName !== 'string' ||
+      !Array.isArray(data.attributes) ||
+      !Array.isArray(data.details?.paragraphs) ||
+      typeof data.details.network !== 'string' ||
+      typeof data.details.contract !== 'string' ||
+      typeof data.details.royalties !== 'string' ||
+      !Array.isArray(data.editions)
+    ) {
+      throw new Error('A API retornou um detalhe de NFT inválido')
+    }
+
+    return data
+  } catch (error) {
+    if (
+      axios.isAxiosError<{ code?: string }>(error) &&
+      error.response?.status === 404 &&
+      error.response.data?.code === 'NFT_NOT_FOUND'
+    ) {
+      return null
+    }
+
+    throw error
+  }
 }

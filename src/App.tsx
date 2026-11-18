@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { listNfts } from '@/features/catalog/catalog-api'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import CatalogFilters from '@/features/catalog/catalog-filters'
 
 export default function App() {
@@ -59,7 +59,16 @@ export default function App() {
         <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((nft) => (
             <li key={nft.id} className="rounded-md border p-4">
-              <h2>{nft.name}</h2>
+              <h2>
+                <Link
+                  to="/nfts/$nftId"
+                  params={{ nftId: nft.id }}
+                  search={search}
+                  className="underline"
+                >
+                  {nft.name}
+                </Link>
+              </h2>
               <p>{nft.priceEth.replace('.', ',')} ETH</p>
             </li>
           ))}

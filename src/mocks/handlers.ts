@@ -1,6 +1,9 @@
 import { delay, http, HttpResponse } from 'msw'
-import type { NftListResponse } from '@/features/catalog/catalog-api'
-import { parseCatalogSearch } from '@/features/catalog/catalog-search'
+import type { NftDetail, NftListResponse } from '@/features/catalog/catalog-api'
+import {
+  catalogOptions,
+  parseCatalogSearch,
+} from '@/features/catalog/catalog-search'
 import { nfts } from './fixtures/nfts'
 
 const PAGE_SIZE = 3
@@ -63,6 +66,53 @@ export const handlers = [
       items: matches.slice(start, start + PAGE_SIZE),
       total: matches.length,
       pageSize: PAGE_SIZE,
+    })
+  }),
+  http.get('/api/nfts/:nftId', async ({ params }) => {
+    await delay(350)
+
+    if (import.meta.env.VITE_MOCK_CATALOG === 'error') {
+      return HttpResponse.json(
+        { message: 'Detalhe temporariamente indisponível' },
+        { status: 503 },
+      )
+    }
+
+    const nft = nfts.find((item) => item.id === params.nftId)
+
+    if (!nft) {
+      return HttpResponse.json({ code: 'NFT_NOT_FOUND' }, { status: 404 })
+    }
+
+    const networkName = catalogOptions.network[nft.network]
+
+    return HttpResponse.json<NftDetail>({
+      ...nft,
+      description: `${nft.name} é um colecionável digital da Kurio, com arte desbloqueável e acesso para colecionadores.`,
+      collectionName: 'Kurio Apes',
+      attributes:
+        nft.id === '0042'
+          ? ['Óculos', 'Esmeralda', 'Raro']
+          : [catalogOptions.collection[nft.collection]],
+      details: {
+        paragraphs: [
+          `${nft.name} faz parte da coleção Kurio Apes e explora identidade, movimento e luz na arte digital.`,
+          'A coleção inclui arte em alta resolução e lançamentos exclusivos para colecionadores.',
+        ],
+        network: `Cunhado na rede ${networkName}, com metadados armazenados no IPFS.`,
+        contract:
+          nft.network === 'ethereum'
+            ? '0x7A42…19E8 · Contrato inteligente ERC-721 simulado.'
+            : `Referência de contrato simulada na rede ${networkName}.`,
+        royalties:
+          'O criador recebe 5% de direitos autorais nas vendas secundárias.',
+      },
+      editions: [
+        { id: 'unique', label: '1/1', availableQuantity: 0 },
+        { id: 'limited-10', label: '1/10', availableQuantity: 2 },
+        { id: 'limited-50', label: '1/50', availableQuantity: 5 },
+        { id: 'open', label: 'Aberta', availableQuantity: 8 },
+      ],
     })
   }),
 ]
