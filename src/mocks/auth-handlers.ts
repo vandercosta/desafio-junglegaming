@@ -1,5 +1,10 @@
 import { delay, http, HttpResponse } from 'msw'
-import type { LoginInput, Session } from '@/features/auth/auth-api'
+import type {
+  LoginInput,
+  RegisterErrors,
+  RegisterInput,
+  Session,
+} from '@/features/auth/auth-api'
 import { users } from './fixtures/users'
 
 const storageKey = 'kurio:mock-session:v1'
@@ -8,6 +13,43 @@ const sessionDurationMs = 30 * 60 * 1000
 type StoredSession = {
   userId: string
   expiresAt: number
+}
+
+const registeredUsersKey = 'kurio:mock-users:v1'
+
+type MockUser = (typeof users)[number]
+
+const userFields = [
+  'id',
+  'username',
+  'displayName',
+  'email',
+  'salt',
+  'verifier',
+] as const
+
+function isMockUser(value: unknown): value is MockUser {
+  if (typeof value !== 'object' || value === null) return false
+
+  const user = value as Partial<MockUser>
+
+  return userFields.every((field) => typeof user[field] === 'string')
+}
+
+function readRegisteredUsers(): MockUser[] {
+  try {
+    const data: unknown = JSON.parse(
+      localStorage.getItem(registeredUsersKey) ?? '[]',
+    )
+
+    return Array.isArray(data) ? data.filter(isMockUser) : []
+  } catch {
+    return []
+  }
+}
+
+function listUsers(): MockUser[] {
+  return [...users, ...readRegisteredUsers()]
 }
 
 function readSession(): StoredSession | null {
@@ -27,11 +69,12 @@ function readSession(): StoredSession | null {
   }
 }
 
-async function verifyPassword(
+async function derivePasswordVerifier(
   password: string,
-  user: (typeof users)[number],
-): Promise<boolean> {
-  const salt = Uint8Array.from(atob(user.salt), (char) => char.charCodeAt(0))
+  encodedSalt: string,
+): Promise<string> {
+  const salt = Uint8Array.from(atob(encodedSalt), (char) => char.charCodeAt(0))
+
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),
@@ -46,7 +89,7 @@ async function verifyPassword(
     256,
   )
 
-  return btoa(String.fromCharCode(...new Uint8Array(bits))) === user.verifier
+  return btoa(String.fromCharCode(...new Uint8Array(bits)))
 }
 
 function toSession(
@@ -75,9 +118,13 @@ export const authHandlers = [
     }
 
     const email = input.email.trim().toLowerCase()
-    const user = users.find((candidate) => candidate.email === email)
+    const user = listUsers().find((candidate) => candidate.email === email)
 
-    if (!user || !(await verifyPassword(input.password, user))) {
+    if (
+      !user ||
+      (await derivePasswordVerifier(input.password, user.salt)) !==
+        user.verifier
+    ) {
       return HttpResponse.json({ code: 'INVALID_CREDENTIALS' }, { status: 401 })
     }
 
@@ -95,7 +142,9 @@ export const authHandlers = [
     await delay(150)
 
     const stored = readSession()
-    const user = users.find((candidate) => candidate.id === stored?.userId)
+    const user = listUsers().find(
+      (candidate) => candidate.id === stored?.userId,
+    )
 
     if (!stored || !user) return HttpResponse.json({ session: null })
 
@@ -112,5 +161,83 @@ export const authHandlers = [
     localStorage.removeItem(storageKey)
 
     return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post('/api/auth/register', async ({ request }) => {
+    await delay(250)
+
+    const input = (await request.json().catch(() => null)) as Partial<
+      Record<keyof RegisterInput, unknown>
+    > | null
+
+    const username =
+      typeof input?.username === 'string'
+        ? input.username.trim().toLowerCase()
+        : ''
+    const email =
+      typeof input?.email === 'string' ? input.email.trim().toLowerCase() : ''
+    const password = typeof input?.password === 'string' ? input.password : ''
+
+    const fields: RegisterErrors = {}
+
+    if (!/^[a-z0-9_]{3,24}$/.test(username)) {
+      fields.username = 'Use de 3 a 24 letras, números ou sublinhados.'
+    }
+
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      fields.email = 'Informe um e-mail válido.'
+    }
+
+    if (password.length < 8 || password.length > 128) {
+      fields.password = 'Use uma senha de 8 a 128 caracteres.'
+    }
+
+    if (Object.keys(fields).length > 0) {
+      return HttpResponse.json(
+        { code: 'VALIDATION_ERROR', fields },
+        { status: 422 },
+      )
+    }
+
+    const saltBytes = crypto.getRandomValues(new Uint8Array(16))
+    const salt = btoa(String.fromCharCode(...saltBytes))
+    const verifier = await derivePasswordVerifier(password, salt)
+
+    return navigator.locks.request(registeredUsersKey, () => {
+      const registeredUsers = readRegisteredUsers()
+      const existingUsers = [...users, ...registeredUsers]
+      const conflicts: RegisterErrors = {}
+
+      if (existingUsers.some((user) => user.email === email)) {
+        conflicts.email = 'Este e-mail já está cadastrado.'
+      }
+
+      if (existingUsers.some((user) => user.username === username)) {
+        conflicts.username = 'Este nome de usuário já está em uso.'
+      }
+
+      if (Object.keys(conflicts).length > 0) {
+        return HttpResponse.json(
+          { code: 'ACCOUNT_CONFLICT', fields: conflicts },
+          { status: 409 },
+        )
+      }
+
+      const user: MockUser = {
+        id: crypto.randomUUID(),
+        username,
+        displayName: username,
+        email,
+        salt,
+        verifier,
+      }
+
+      localStorage.setItem(
+        registeredUsersKey,
+        JSON.stringify([...registeredUsers, user]),
+      )
+
+      return HttpResponse.json({ email }, { status: 201 })
+    })
   }),
 ]

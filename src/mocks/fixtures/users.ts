@@ -1,6 +1,7 @@
 export const users = [
   {
     id: 'user-ana',
+    username: 'ana_demo',
     displayName: 'Ana Demo',
     email: 'ana@kurio.example.test',
     salt: 'xEubcjuBnWNnhUvUYNaZcg==',
@@ -8,6 +9,7 @@ export const users = [
   },
   {
     id: 'user-bruno',
+    username: 'bruno_demo',
     displayName: 'Bruno Demo',
     email: 'bruno@kurio.example.test',
     salt: 'wVvd32x5Hsu11iBid7+1hQ==',

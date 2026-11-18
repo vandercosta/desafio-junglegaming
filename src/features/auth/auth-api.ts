@@ -24,6 +24,24 @@ type SessionResponse = { session: Session | null }
 
 export const sessionQueryKey = ['session'] as const
 
+export type RegisterInput = {
+  username: string
+  email: string
+  password: string
+}
+
+export type RegisterErrors = Partial<Record<keyof RegisterInput, string>>
+
+export async function registerAccount(input: RegisterInput): Promise<string> {
+  const { data } = await api.post<{ email: string }>('/auth/register', input)
+
+  if (typeof data?.email !== 'string') {
+    throw new Error('A API não retornou o e-mail da conta criada')
+  }
+
+  return data.email
+}
+
 export async function getSession(signal: AbortSignal): Promise<SessionState> {
   try {
     const { data } = await api.get<SessionResponse>('/auth/session', { signal })

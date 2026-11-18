@@ -1,22 +1,33 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Outlet, useLocation, useNavigate } from '@tanstack/react-router'
+import {
+  Outlet,
+  useLocation,
+  useNavigate,
+  useRouter,
+} from '@tanstack/react-router'
 import axios from 'axios'
-import { Dialog } from 'radix-ui'
-import { useRef, type SubmitEvent } from 'react'
+import { Dialog, Tabs } from 'radix-ui'
+import { useRef, type SubmitEvent, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   getSession,
   sessionQueryKey,
   signIn,
   signOut,
+  registerAccount,
+  type RegisterErrors,
   type Session,
   type SessionState,
 } from './auth-api'
+import RegisterForm from './register-form'
 
 export default function SessionLayout() {
-  const loginRequested = useLocation({
-    select: (location) => location.search.auth === 'entrar',
+  const authMode = useLocation({
+    select: (location) => location.search.auth,
   })
+  const router = useRouter()
+  const [registeredEmail, setRegisteredEmail] = useState('')
+
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const brandRef = useRef<HTMLParagraphElement>(null)
@@ -30,15 +41,15 @@ export default function SessionLayout() {
 
   const user = sessionQuery.data?.session?.user
 
-  function setLoginOpen(open: boolean) {
+  function setAuthMode(
+    mode: 'entrar' | 'cadastrar' | undefined,
+    replace = true,
+  ) {
     void navigate({
       to: '.',
-      search: (previous) => ({
-        ...previous,
-        auth: open ? 'entrar' : undefined,
-      }),
+      search: (previous) => ({ ...previous, auth: mode }),
       hash: true,
-      replace: !open,
+      replace,
       resetScroll: false,
     })
   }
@@ -61,7 +72,7 @@ export default function SessionLayout() {
     gcTime: 0,
     onSuccess: async (session) => {
       await updateSession(session)
-      setLoginOpen(false)
+      setAuthMode(undefined)
     },
   })
 
@@ -70,9 +81,29 @@ export default function SessionLayout() {
     retry: false,
     onSuccess: async () => {
       await updateSession(null)
-      if (loginRequested) setLoginOpen(false)
+      if (authMode === 'entrar') setAuthMode(undefined)
     },
   })
+
+  const registration = useMutation({
+    mutationFn: registerAccount,
+    retry: false,
+    gcTime: 0,
+    onSuccess: (email) => {
+      if (router.state.location.search.auth !== 'cadastrar') return
+
+      setRegisteredEmail(email)
+      setAuthMode('entrar')
+    },
+  })
+
+  const authPending = login.isPending || registration.isPending
+
+  const registrationErrors = axios.isAxiosError<{ fields?: RegisterErrors }>(
+    registration.error,
+  )
+    ? registration.error.response?.data?.fields
+    : undefined
 
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -87,7 +118,7 @@ export default function SessionLayout() {
   }
 
   function preventDismissWhilePending(event: Event) {
-    if (login.isPending) event.preventDefault()
+    if (authPending) event.preventDefault()
   }
 
   const invalidCredentials =
@@ -96,11 +127,14 @@ export default function SessionLayout() {
 
   return (
     <Dialog.Root
-      open={loginRequested && !user && sessionQuery.data !== undefined}
+      open={authMode !== undefined && !user && sessionQuery.data !== undefined}
       onOpenChange={(open) => {
-        if (login.isPending) return
+        if (authPending) return
+
         login.reset()
-        setLoginOpen(open)
+        registration.reset()
+        setRegisteredEmail('')
+        setAuthMode(open ? 'entrar' : undefined, !open)
       }}
     >
       <header className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-4">
@@ -165,58 +199,110 @@ export default function SessionLayout() {
             }
           }}
         >
-          <Dialog.Title className="text-xl font-semibold">Entrar</Dialog.Title>
+          <Dialog.Title className="sr-only">
+            {authMode === 'cadastrar' ? 'Criar conta' : 'Entrar'}
+          </Dialog.Title>
           <Dialog.Description>
-            Entre na sua conta de colecionador.
+            {authMode === 'cadastrar'
+              ? 'Crie seu perfil de colecionador.'
+              : 'Entre na sua conta de colecionador.'}
           </Dialog.Description>
 
-          <form onSubmit={handleSubmit} className="grid gap-3">
-            <label htmlFor="login-email">E-mail</label>
-            <input
-              id="login-email"
-              name="email"
-              type="email"
-              autoComplete="username"
-              required
-              readOnly={login.isPending}
-              className="rounded-md border p-2"
-            />
+          <Tabs.Root
+            value={authMode ?? 'entrar'}
+            activationMode="manual"
+            onValueChange={(value) => {
+              if (authPending || (value !== 'entrar' && value !== 'cadastrar'))
+                return
 
-            <label htmlFor="login-password">Senha</label>
-            <input
-              id="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              readOnly={login.isPending}
-              className="rounded-md border p-2"
-            />
-
-            {login.isError && (
-              <p role="alert">
-                {invalidCredentials
-                  ? 'E-mail ou senha incorretos.'
-                  : 'Não foi possível entrar. Tente novamente.'}
-              </p>
-            )}
-
-            <div className="flex flex-wrap justify-end gap-2">
-              <Dialog.Close asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={login.isPending}
-                >
-                  Cancelar
+              login.reset()
+              registration.reset()
+              setRegisteredEmail('')
+              setAuthMode(value)
+            }}
+          >
+            <Tabs.List aria-label="Acesso à conta" className="mb-4 flex gap-2">
+              <Tabs.Trigger value="entrar" disabled={authPending} asChild>
+                <Button variant={authMode === 'entrar' ? 'default' : 'ghost'}>
+                  Entrar
                 </Button>
-              </Dialog.Close>
+              </Tabs.Trigger>
+              <Tabs.Trigger value="cadastrar" disabled={authPending} asChild>
+                <Button
+                  variant={authMode === 'cadastrar' ? 'default' : 'ghost'}
+                >
+                  Criar conta
+                </Button>
+              </Tabs.Trigger>
+            </Tabs.List>
 
-              <Button type="submit" disabled={login.isPending}>
-                {login.isPending ? 'Entrando…' : 'Entrar'}
-              </Button>
-            </div>
-          </form>
+            <Tabs.Content value="entrar">
+              {registeredEmail && (
+                <p role="status" className="mb-3">
+                  Conta criada. Entre com a sua senha.
+                </p>
+              )}
+              {
+                <form onSubmit={handleSubmit} className="grid gap-3">
+                  <label htmlFor="login-email">E-mail</label>
+                  <input
+                    id="login-email"
+                    name="email"
+                    type="email"
+                    autoComplete="username"
+                    defaultValue={registeredEmail}
+                    required
+                    readOnly={login.isPending}
+                    className="rounded-md border p-2"
+                  />
+
+                  <label htmlFor="login-password">Senha</label>
+                  <input
+                    id="login-password"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    readOnly={login.isPending}
+                    className="rounded-md border p-2"
+                  />
+
+                  {login.isError && (
+                    <p role="alert">
+                      {invalidCredentials
+                        ? 'E-mail ou senha incorretos.'
+                        : 'Não foi possível entrar. Tente novamente.'}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Dialog.Close asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={login.isPending}
+                      >
+                        Cancelar
+                      </Button>
+                    </Dialog.Close>
+
+                    <Button type="submit" disabled={login.isPending}>
+                      {login.isPending ? 'Entrando…' : 'Entrar'}
+                    </Button>
+                  </div>
+                </form>
+              }
+            </Tabs.Content>
+
+            <Tabs.Content value="cadastrar">
+              <RegisterForm
+                pending={registration.isPending}
+                errors={registrationErrors}
+                hasError={registration.isError}
+                onSubmit={(input) => registration.mutate(input)}
+              />
+            </Tabs.Content>
+          </Tabs.Root>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

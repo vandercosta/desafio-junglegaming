@@ -12,9 +12,10 @@ Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Ku
 - Cotação do carrinho pela API simulada, com subtotal, desconto, taxa de rede e total. O cupom aplicado é mantido após atualizar a página.
 - Remoção otimista no carrinho. A linha some enquanto a solicitação está pendente e reaparece se a API rejeitar a operação.
 - Login e logout simulados, com recuperação da sessão após atualizar a página e aviso de expiração. O diálogo de login preserva a rota e os filtros atuais.
+- Cadastro de colecionadores com validação por campo, tratamento de conflitos e persistência das contas de demonstração.
 - Estados de carregamento, lista vazia, erro e recurso inexistente.
 
-A próxima etapa é o cadastro de colecionadores, seguido da integração da sessão com o carrinho por conta. Favoritos, perfil, carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
+A próxima etapa é integrar a sessão com o carrinho por conta. Favoritos, perfil, carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
 
 ## Tecnologias
 
@@ -77,6 +78,16 @@ Use uma destas contas fictícias no modo `demo`.
 
 O MSW verifica as senhas com PBKDF2 e salt. A sessão simulada dura 30 minutos, e o armazenamento local guarda o ID do usuário e a expiração. O carrinho de visitante permanece no navegador ao entrar ou sair.
 
+### Criar uma conta
+
+1. Execute `npm run dev:mocks`, abra **Entrar** e selecione a aba **Criar conta**. Você também pode abrir o cadastro com `/?auth=cadastrar`.
+2. Use um nome de usuário fictício, como `luna_demo`, e um e-mail fictício, como `luna@kurio.example.test`. Informe uma senha de 8 a 128 caracteres e confirme-a.
+3. Após **Criar conta**, a aba **Entrar** abre com o e-mail preenchido. Digite a senha para entrar e recarregue a página para verificar a restauração da sessão.
+
+O nome de usuário aceita de 3 a 24 letras de `a` a `z`, números ou sublinhados. O mock normaliza o nome de usuário e o e-mail para minúsculas, remove espaços nas extremidades e verifica duplicidades nas fixtures e nas contas já cadastradas. As novas contas persistem no navegador com sal individual e verificador PBKDF2.
+
+Para reproduzir um erro de formulário, informe senhas diferentes nos campos de senha e confirmação. Para reproduzir HTTP `409`, tente cadastrar `ana_demo` e `ana@kurio.example.test` com uma senha válida e confirmada. O diálogo exibe uma mensagem abaixo de cada campo em conflito.
+
 ### Reproduzir uma falha de login ou uma sessão expirada
 
 Para testar credenciais inválidas, use um dos e-mails da tabela com uma senha diferente. A interface mostra **E-mail ou senha incorretos.** e permite reenviar o formulário.
@@ -132,11 +143,12 @@ VITE_MOCK_CART_EDITS=error npm run dev:mocks
 
 Para restaurar as respostas padrão, reinicie o servidor com `npm run dev:mocks`, sem as variáveis de cenário.
 
-O mock guarda a sessão, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. O trecho abaixo encerra a sessão e esvazia o carrinho quando executado no console do navegador.
+O mock guarda a sessão, as contas cadastradas, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Execute o trecho abaixo no console do navegador para limpar esses dados e voltar às contas de demonstração originais.
 
 ```js
 localStorage.removeItem('kurio:guest-cart:v1')
 localStorage.removeItem('kurio:mock-session:v1')
+localStorage.removeItem('kurio:mock-users:v1')
 location.reload()
 ```
 
@@ -155,6 +167,7 @@ O servidor de desenvolvimento e o preview usam portas diferentes. Limpe as chave
 | `PUT`    | `/api/cart/coupon`        | Recebe `{ code }`, aplica o cupom válido e retorna o carrinho com a cotação atualizada.                                                                                         |
 | `DELETE` | `/api/cart/coupon`        | Remove o cupom e retorna o carrinho com a cotação atualizada.                                                                                                                   |
 | `POST`   | `/api/auth/login`         | Recebe `{ email, password }` e retorna a sessão. Dados inválidos retornam HTTP `400` com `INVALID_INPUT`. Credenciais incorretas retornam HTTP `401` com `INVALID_CREDENTIALS`. |
+| `POST`   | `/api/auth/register`      | Recebe `{ username, email, password }` e retorna HTTP `201` com `{ email }`. Responde com `422 VALIDATION_ERROR` ou `409 ACCOUNT_CONFLICT`, ambos com mensagens em `fields`.    |
 | `GET`    | `/api/auth/session`       | Retorna a sessão atual ou `{ session: null }`. Sessão expirada retorna HTTP `401` com `SESSION_EXPIRED`.                                                                        |
 | `DELETE` | `/api/auth/session`       | Encerra a sessão e retorna HTTP `204`.                                                                                                                                          |
 
@@ -199,10 +212,10 @@ npm run test:e2e
 
 O Playwright inicia o Vite com mocks na porta `4175` e executa os casos em Chromium desktop (`1440 × 900`) e mobile (`390 × 844`). A cobertura inclui detalhe e NFT inexistente, carrinho e persistência, recálculo da cotação e cupons. Os testes de autenticação cobrem sessão após atualizar a página, credenciais incorretas, logout, troca de conta, expiração e preservação da URL do NFT ao entrar.
 
-Execute apenas a suíte de autenticação com o comando abaixo.
+Os testes de cadastro verificam o preenchimento do e-mail na aba **Entrar**, a recuperação da sessão da nova conta após recarregar e os erros de confirmação de senha e de conflito de cadastro. Execute as suítes de login e cadastro com o comando abaixo.
 
 ```bash
-npm run test:e2e -- auth.spec.ts
+npm run test:e2e -- auth.spec.ts registration.spec.ts
 ```
 
 Abra o relatório HTML com:

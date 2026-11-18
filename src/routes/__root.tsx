@@ -3,9 +3,15 @@ import NotFoundPage from '@/components/not-found-page'
 import SessionLayout from '@/features/auth/session-layout'
 
 export const Route = createRootRoute({
-  validateSearch: (search: Record<string, unknown>): { auth?: 'entrar' } => ({
-    auth: search.auth === 'entrar' ? 'entrar' : undefined,
-  }),
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { auth?: 'entrar' | 'cadastrar' } => {
+    const auth = search.auth
+
+    return {
+      auth: auth === 'entrar' || auth === 'cadastrar' ? auth : undefined,
+    }
+  },
   component: SessionLayout,
   notFoundComponent: NotFoundPage,
 })
