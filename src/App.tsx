@@ -32,6 +32,9 @@ export default function App() {
   return (
     <main className="mx-auto max-w-5xl p-6">
       <h1 className="text-2xl font-semibold">Catálogo de NFTs</h1>
+      <Link to="/carrinho" search={search} className="underline">
+        Carrinho
+      </Link>
 
       <CatalogFilters
         search={search}

@@ -4,8 +4,19 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { getNft } from './catalog-api'
 import type { NftEdition } from './catalog-api'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
+import axios from 'axios'
+import { addCartItem, guestCartQueryKey } from '@/features/cart/cart-api'
+import type { CatalogSearch } from './catalog-search'
 
-function EditionPicker({ editions }: { editions: NftEdition[] }) {
+type EditionPickerProps = {
+  nftId: string
+  editions: NftEdition[]
+  search: CatalogSearch
+}
+
+function EditionPicker({ nftId, editions, search }: EditionPickerProps) {
   const [editionId, setEditionId] = useState(
     () => editions.find((edition) => edition.availableQuantity > 0)?.id ?? '',
   )
@@ -14,6 +25,23 @@ function EditionPicker({ editions }: { editions: NftEdition[] }) {
   const edition = editions.find((item) => item.id === editionId)
   const available = edition?.availableQuantity ?? 0
   const selectedQuantity = Math.min(quantity, available)
+
+  const queryClient = useQueryClient()
+  const navigate = useNavigate({ from: '/nfts/$nftId' })
+
+  const addItem = useMutation({
+    mutationFn: addCartItem,
+    retry: false,
+    scope: { id: 'guest-cart' },
+    onSuccess: async (cart) => {
+      await queryClient.cancelQueries({ queryKey: guestCartQueryKey })
+      queryClient.setQueryData(guestCartQueryKey, cart)
+    },
+  })
+
+  const errorMessage = axios.isAxiosError<{ message?: string }>(addItem.error)
+    ? addItem.error.response?.data?.message
+    : undefined
 
   return (
     <section aria-label="Edição e quantidade" className="grid gap-3">
@@ -63,6 +91,29 @@ function EditionPicker({ editions }: { editions: NftEdition[] }) {
         >
           +
         </Button>
+
+        <Button
+          type="button"
+          disabled={!edition || selectedQuantity === 0 || addItem.isPending}
+          onClick={() =>
+            addItem.mutate(
+              { nftId, editionId, quantity: selectedQuantity },
+              {
+                onSuccess: () => {
+                  void navigate({ to: '/carrinho', search })
+                },
+              },
+            )
+          }
+        >
+          {addItem.isPending ? 'Adicionando…' : 'Comprar'}
+        </Button>
+
+        {addItem.isError && (
+          <p role="alert">
+            {errorMessage ?? 'Não foi possível adicionar o NFT ao carrinho.'}
+          </p>
+        )}
       </div>
     </section>
   )
@@ -114,7 +165,12 @@ export default function NftDetailPage() {
             <p>{nft.description}</p>
           </section>
 
-          <EditionPicker key={nft.id} editions={nft.editions} />
+          <EditionPicker
+            key={nft.id}
+            nftId={nft.id}
+            editions={nft.editions}
+            search={search}
+          />
 
           <dl>
             <div>

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import type { CatalogSearch } from './catalog-search'
+import { api } from '@/lib/api'
 
 export type NftSummary = {
   id: string
@@ -34,17 +35,11 @@ export type NftListResponse = {
   pageSize: number
 }
 
-const catalogApi = axios.create({
-  baseURL: '/api',
-  headers: { Accept: 'application/json' },
-  timeout: 5000,
-})
-
 export async function listNfts(
   search: CatalogSearch,
   signal: AbortSignal,
 ): Promise<NftListResponse> {
-  const { data } = await catalogApi.get<NftListResponse>('/nfts', {
+  const { data } = await api.get<NftListResponse>('/nfts', {
     params: search,
     signal,
   })
@@ -67,7 +62,7 @@ export async function getNft(
   signal: AbortSignal,
 ): Promise<NftDetail | null> {
   try {
-    const { data } = await catalogApi.get<NftDetail>(
+    const { data } = await api.get<NftDetail>(
       `/nfts/${encodeURIComponent(nftId)}`,
       { signal },
     )

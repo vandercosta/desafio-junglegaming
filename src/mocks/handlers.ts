@@ -4,14 +4,11 @@ import {
   catalogOptions,
   parseCatalogSearch,
 } from '@/features/catalog/catalog-search'
-import { nfts } from './fixtures/nfts'
+import { nfts, nftEditions } from './fixtures/nfts'
+import { toWei } from '@/lib/eth'
+import { cartHandlers } from './cart-handlers'
 
 const PAGE_SIZE = 3
-
-function toWei(decimal: string): bigint {
-  const [whole = '0', fraction = ''] = decimal.split('.')
-  return BigInt(`${whole}${fraction.padEnd(18, '0')}`)
-}
 
 export const handlers = [
   http.get('/api/nfts', async ({ request }) => {
@@ -107,12 +104,8 @@ export const handlers = [
         royalties:
           'O criador recebe 5% de direitos autorais nas vendas secundárias.',
       },
-      editions: [
-        { id: 'unique', label: '1/1', availableQuantity: 0 },
-        { id: 'limited-10', label: '1/10', availableQuantity: 2 },
-        { id: 'limited-50', label: '1/50', availableQuantity: 5 },
-        { id: 'open', label: 'Aberta', availableQuantity: 8 },
-      ],
+      editions: nftEditions,
     })
   }),
+  ...cartHandlers,
 ]

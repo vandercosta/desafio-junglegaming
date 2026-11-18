@@ -1,4 +1,4 @@
-import type { NftSummary } from '@/features/catalog/catalog-api'
+import type { NftEdition, NftSummary } from '@/features/catalog/catalog-api'
 
 export const nfts: NftSummary[] = [
   {
@@ -64,4 +64,11 @@ export const nfts: NftSummary[] = [
     collection: 'musica',
     network: 'solana',
   },
+]
+
+export const nftEditions: NftEdition[] = [
+  { id: 'unique', label: '1/1', availableQuantity: 0 },
+  { id: 'limited-10', label: '1/10', availableQuantity: 2 },
+  { id: 'limited-50', label: '1/50', availableQuantity: 5 },
+  { id: 'open', label: 'Aberta', availableQuantity: 8 },
 ]
