@@ -13,9 +13,7 @@ function isCartSelection(value: unknown): value is CartSelection {
   return (
     typeof nftId === 'string' &&
     typeof editionId === 'string' &&
-    typeof quantity === 'number' &&
-    Number.isSafeInteger(quantity) &&
-    quantity > 0
+    isQuantity(quantity)
   )
 }
 
@@ -29,6 +27,14 @@ function readSelections(): CartSelection[] {
   } catch {
     return []
   }
+}
+
+function cartItemId(selection: CartSelection): string {
+  return `${selection.nftId}:${selection.editionId}`
+}
+
+function isQuantity(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
 function buildCart(selections: CartSelection[]): CartResponse {
@@ -46,16 +52,32 @@ function buildCart(selections: CartSelection[]): CartResponse {
     return [
       {
         ...selection,
-        id: `${selection.nftId}:${selection.editionId}`,
+        id: cartItemId(selection),
         nftName: nft.name,
         editionLabel: edition.label,
         unitPriceEth: nft.priceEth,
         lineTotalEth: fromWei(lineTotal),
+        availableQuantity: edition.availableQuantity,
       },
     ]
   })
 
   return { items, subtotalEth: fromWei(subtotal) }
+}
+
+function persistCart(selections: CartSelection[]) {
+  const cart = buildCart(selections)
+  localStorage.setItem(storageKey, JSON.stringify(selections))
+  return HttpResponse.json(cart)
+}
+
+function simulatedEditFailure() {
+  if (import.meta.env.VITE_MOCK_CART_EDITS === 'error') {
+    return HttpResponse.json(
+      { message: 'O carrinho está temporariamente indisponível.' },
+      { status: 503 },
+    )
+  }
 }
 
 export const cartHandlers = [
@@ -104,9 +126,67 @@ export const cartHandlers = [
     if (index === -1) selections.push(next)
     else selections[index] = next
 
-    const cart = buildCart(selections)
-    localStorage.setItem(storageKey, JSON.stringify(selections))
+    return persistCart(selections)
+  }),
 
-    return HttpResponse.json(cart)
+  http.patch('/api/cart/items/:itemId', async ({ params, request }) => {
+    await delay(350)
+
+    const failure = simulatedEditFailure()
+    if (failure) return failure
+
+    const body: unknown = await request.json().catch(() => null)
+    const quantity =
+      typeof body === 'object' && body !== null && 'quantity' in body
+        ? body.quantity
+        : undefined
+
+    if (!isQuantity(quantity)) {
+      return HttpResponse.json(
+        { message: 'Informe uma quantidade inteira maior que zero.' },
+        { status: 400 },
+      )
+    }
+
+    const selections = readSelections()
+    const item = selections.find(
+      (selection) => cartItemId(selection) === params.itemId,
+    )
+    const edition = nftEditions.find(
+      (candidate) => candidate.id === item?.editionId,
+    )
+
+    if (!item || !edition) {
+      return HttpResponse.json(
+        { message: 'Item do carrinho não encontrado.' },
+        { status: 404 },
+      )
+    }
+
+    if (quantity > edition.availableQuantity) {
+      return HttpResponse.json(
+        { message: 'A quantidade ultrapassa o estoque desta edição.' },
+        { status: 409 },
+      )
+    }
+
+    return persistCart(
+      selections.map((selection) =>
+        selection === item ? { ...selection, quantity } : selection,
+      ),
+    )
+  }),
+
+  http.delete('/api/cart/items/:itemId', async ({ params }) => {
+    await delay(350)
+
+    const failure = simulatedEditFailure()
+    if (failure) return failure
+
+    return persistCart(
+      readSelections().filter(
+        (selection) => cartItemId(selection) !== params.itemId,
+      ),
+    )
   }),
 ]

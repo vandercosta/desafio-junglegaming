@@ -12,6 +12,7 @@ export type CartItem = CartSelection & {
   editionLabel: string
   unitPriceEth: string
   lineTotalEth: string
+  availableQuantity: number
 }
 
 export type CartResponse = {
@@ -38,5 +39,25 @@ export async function addCartItem(
   selection: CartSelection,
 ): Promise<CartResponse> {
   const { data } = await api.post<CartResponse>('/cart/items', selection)
+  return validateCart(data)
+}
+
+export async function updateCartItemQuantity(
+  itemId: string,
+  quantity: number,
+): Promise<CartResponse> {
+  const { data } = await api.patch<CartResponse>(
+    `/cart/items/${encodeURIComponent(itemId)}`,
+    { quantity },
+  )
+
+  return validateCart(data)
+}
+
+export async function removeCartItem(itemId: string): Promise<CartResponse> {
+  const { data } = await api.delete<CartResponse>(
+    `/cart/items/${encodeURIComponent(itemId)}`,
+  )
+
   return validateCart(data)
 }
