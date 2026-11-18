@@ -4,6 +4,27 @@ import { fromWei, toWei } from '@/lib/eth'
 import { nftEditions, nfts } from './fixtures/nfts'
 
 const storageKey = 'kurio:guest-cart:v1'
+const networkFee = toWei('0.016')
+
+type CartState = {
+  selections: CartSelection[]
+  couponCode: string | null
+}
+
+type Coupon = {
+  code: string
+  discountBasisPoints: bigint
+  expiresAt: number | null
+}
+
+const coupons: Coupon[] = [
+  { code: 'KURIO10', discountBasisPoints: 1000n, expiresAt: null },
+  {
+    code: 'EXPIRADO10',
+    discountBasisPoints: 1000n,
+    expiresAt: Date.UTC(2024, 0, 1),
+  },
+]
 
 function isCartSelection(value: unknown): value is CartSelection {
   if (typeof value !== 'object' || value === null) return false
@@ -17,16 +38,31 @@ function isCartSelection(value: unknown): value is CartSelection {
   )
 }
 
-function readSelections(): CartSelection[] {
+function readCart(): CartState {
   const stored = localStorage.getItem(storageKey)
-  if (!stored) return []
-
+  let data: unknown
   try {
-    const data: unknown = JSON.parse(stored)
-    return Array.isArray(data) ? data.filter(isCartSelection) : []
+    data = JSON.parse(stored ?? 'null')
   } catch {
-    return []
+    data = null
   }
+
+  if (Array.isArray(data)) {
+    return { selections: data.filter(isCartSelection), couponCode: null }
+  }
+
+  if (typeof data === 'object' && data !== null) {
+    const { selections, couponCode } = data as Partial<CartState>
+
+    return {
+      selections: Array.isArray(selections)
+        ? selections.filter(isCartSelection)
+        : [],
+      couponCode: typeof couponCode === 'string' ? couponCode : null,
+    }
+  }
+
+  return { selections: [], couponCode: null }
 }
 
 function cartItemId(selection: CartSelection): string {
@@ -37,10 +73,14 @@ function isQuantity(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
-function buildCart(selections: CartSelection[]): CartResponse {
+function isCouponExpired(coupon: Coupon, now: number): boolean {
+  return coupon.expiresAt !== null && now >= coupon.expiresAt
+}
+
+function buildCart(state: CartState, now = Date.now()): CartResponse {
   let subtotal = 0n
 
-  const items = selections.flatMap((selection) => {
+  const items = state.selections.flatMap((selection) => {
     const nft = nfts.find((item) => item.id === selection.nftId)
     const edition = nftEditions.find((item) => item.id === selection.editionId)
 
@@ -62,12 +102,37 @@ function buildCart(selections: CartSelection[]): CartResponse {
     ]
   })
 
-  return { items, subtotalEth: fromWei(subtotal) }
+  const candidate = coupons.find((coupon) => coupon.code === state.couponCode)
+  const coupon =
+    items.length > 0 && candidate && !isCouponExpired(candidate, now)
+      ? candidate
+      : undefined
+  const discount = coupon
+    ? (subtotal * coupon.discountBasisPoints) / 10_000n
+    : 0n
+  const fee = items.length > 0 ? networkFee : 0n
+
+  return {
+    items,
+    subtotalEth: fromWei(subtotal),
+    discountEth: fromWei(discount),
+    networkFeeEth: fromWei(fee),
+    totalEth: fromWei(subtotal - discount + fee),
+    couponCode: coupon?.code ?? null,
+    hasStockConflict:
+      items.length !== state.selections.length ||
+      items.some((item) => item.quantity > item.availableQuantity),
+  }
 }
 
-function persistCart(selections: CartSelection[]) {
-  const cart = buildCart(selections)
-  localStorage.setItem(storageKey, JSON.stringify(selections))
+function persistCart(state: CartState, cart = buildCart(state)) {
+  localStorage.setItem(
+    storageKey,
+    JSON.stringify({
+      selections: state.selections,
+      couponCode: cart.couponCode,
+    }),
+  )
   return HttpResponse.json(cart)
 }
 
@@ -82,7 +147,7 @@ function simulatedEditFailure() {
 
 export const cartHandlers = [
   http.get('/api/cart', () => {
-    return HttpResponse.json(buildCart(readSelections()))
+    return HttpResponse.json(buildCart(readCart()))
   }),
 
   http.post('/api/cart/items', async ({ request }) => {
@@ -107,7 +172,8 @@ export const cartHandlers = [
       )
     }
 
-    const selections = readSelections()
+    const state = readCart()
+    const { selections } = state
     const index = selections.findIndex(
       (item) =>
         item.nftId === input.nftId && item.editionId === input.editionId,
@@ -126,7 +192,7 @@ export const cartHandlers = [
     if (index === -1) selections.push(next)
     else selections[index] = next
 
-    return persistCart(selections)
+    return persistCart(state)
   }),
 
   http.patch('/api/cart/items/:itemId', async ({ params, request }) => {
@@ -148,7 +214,8 @@ export const cartHandlers = [
       )
     }
 
-    const selections = readSelections()
+    const state = readCart()
+    const { selections } = state
     const item = selections.find(
       (selection) => cartItemId(selection) === params.itemId,
     )
@@ -170,11 +237,12 @@ export const cartHandlers = [
       )
     }
 
-    return persistCart(
-      selections.map((selection) =>
+    return persistCart({
+      ...state,
+      selections: selections.map((selection) =>
         selection === item ? { ...selection, quantity } : selection,
       ),
-    )
+    })
   }),
 
   http.delete('/api/cart/items/:itemId', async ({ params }) => {
@@ -183,10 +251,72 @@ export const cartHandlers = [
     const failure = simulatedEditFailure()
     if (failure) return failure
 
-    return persistCart(
-      readSelections().filter(
+    const state = readCart()
+    return persistCart({
+      ...state,
+      selections: state.selections.filter(
         (selection) => cartItemId(selection) !== params.itemId,
       ),
-    )
+    })
+  }),
+
+  http.put('/api/cart/coupon', async ({ request }) => {
+    await delay(350)
+
+    const body: unknown = await request.json().catch(() => null)
+    const code =
+      typeof body === 'object' && body !== null && 'code' in body
+        ? body.code
+        : undefined
+    const normalizedCode =
+      typeof code === 'string' ? code.trim().toUpperCase() : ''
+    const coupon = coupons.find((item) => item.code === normalizedCode)
+
+    if (!coupon) {
+      return HttpResponse.json(
+        { code: 'COUPON_INVALID', message: 'Cupom inválido.' },
+        { status: 422 },
+      )
+    }
+
+    const now = Date.now()
+    if (isCouponExpired(coupon, now)) {
+      return HttpResponse.json(
+        { code: 'COUPON_EXPIRED', message: 'Cupom expirado.' },
+        { status: 422 },
+      )
+    }
+
+    const state = { ...readCart(), couponCode: coupon.code }
+    const cart = buildCart(state, now)
+
+    if (cart.items.length === 0) {
+      return HttpResponse.json(
+        {
+          code: 'CART_EMPTY',
+          message: 'Adicione itens antes de aplicar o cupom.',
+        },
+        { status: 409 },
+      )
+    }
+
+    if (cart.hasStockConflict) {
+      return HttpResponse.json(
+        {
+          code: 'CART_STOCK_CONFLICT',
+          message:
+            'Ajuste as quantidades do carrinho antes de aplicar o cupom.',
+        },
+        { status: 409 },
+      )
+    }
+
+    return persistCart(state, cart)
+  }),
+
+  http.delete('/api/cart/coupon', async () => {
+    await delay(350)
+
+    return persistCart({ ...readCart(), couponCode: null })
   }),
 ]

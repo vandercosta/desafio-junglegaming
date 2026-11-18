@@ -1,21 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useSearch } from '@tanstack/react-router'
 import axios from 'axios'
 import { Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
 import {
+  applyCartCoupon,
   getCart,
   guestCartQueryKey,
+  removeCartCoupon,
   removeCartItem,
   updateCartItemQuantity,
 } from './cart-api'
-import { Link, useSearch } from '@tanstack/react-router'
-import { Button } from '@/components/ui/button'
 
 type CartChange =
   | { kind: 'quantity'; itemId: string; quantity: number }
   | { kind: 'remove'; itemId: string }
+  | { kind: 'apply-coupon'; code: string }
+  | { kind: 'remove-coupon' }
 
 export default function CartPage() {
   const search = useSearch({ from: '/carrinho' })
+  const [couponDraft, setCouponDraft] = useState('')
 
   const cart = useQuery({
     queryKey: guestCartQueryKey,
@@ -28,10 +34,18 @@ export default function CartPage() {
   const editCart = useMutation({
     scope: { id: 'guest-cart' },
     retry: false,
-    mutationFn: (change: CartChange) =>
-      change.kind === 'quantity'
-        ? updateCartItemQuantity(change.itemId, change.quantity)
-        : removeCartItem(change.itemId),
+    mutationFn: (change: CartChange) => {
+      switch (change.kind) {
+        case 'quantity':
+          return updateCartItemQuantity(change.itemId, change.quantity)
+        case 'remove':
+          return removeCartItem(change.itemId)
+        case 'apply-coupon':
+          return applyCartCoupon(change.code)
+        case 'remove-coupon':
+          return removeCartCoupon()
+      }
+    },
     onSuccess: async (updatedCart) => {
       await queryClient.cancelQueries({ queryKey: guestCartQueryKey })
       queryClient.setQueryData(guestCartQueryKey, updatedCart)
@@ -50,9 +64,26 @@ export default function CartPage() {
     (item) => item.id !== removingItemId,
   )
 
-  const apiMessage = axios.isAxiosError<{ message?: string }>(editCart.error)
-    ? editCart.error.response?.data?.message
+  const changeKind = editCart.variables?.kind
+  const isCouponChange =
+    changeKind === 'apply-coupon' || changeKind === 'remove-coupon'
+  const errorData = axios.isAxiosError<{
+    code?: string
+    message?: unknown
+  }>(editCart.error)
+    ? editCart.error.response?.data
     : undefined
+  const apiMessage = errorData?.message
+  const couponError =
+    editCart.isError && isCouponChange
+      ? typeof apiMessage === 'string'
+        ? apiMessage
+        : 'Não foi possível atualizar o cupom.'
+      : undefined
+  const invalidCoupon =
+    changeKind === 'apply-coupon' &&
+    (errorData?.code === 'COUPON_INVALID' ||
+      errorData?.code === 'COUPON_EXPIRED')
 
   return (
     <main className="mx-auto grid max-w-5xl gap-6 p-6">
@@ -60,7 +91,7 @@ export default function CartPage() {
 
       {editCart.isPending && <p role="status">Atualizando carrinho…</p>}
 
-      {editCart.isError && (
+      {editCart.isError && !isCouponChange && (
         <p role="alert">
           {typeof apiMessage === 'string'
             ? apiMessage
@@ -84,6 +115,12 @@ export default function CartPage() {
       )}
 
       {cart.data?.items.length === 0 && <p>Seu carrinho está vazio.</p>}
+      {cart.data?.hasStockConflict && (
+        <p role="alert">
+          O estoque de um ou mais NFTs mudou. Ajuste as quantidades ou remova os
+          itens indisponíveis para atualizar o carrinho.
+        </p>
+      )}
 
       {cart.data && cart.data.items.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
@@ -184,12 +221,105 @@ export default function CartPage() {
           >
             <h2 id="cart-summary">Resumo da carteira</h2>
 
+            <form
+              className="mt-4 grid gap-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const code = couponDraft.trim()
+
+                if (code && !editCart.isPending) {
+                  editCart.mutate(
+                    { kind: 'apply-coupon', code },
+                    { onSuccess: () => setCouponDraft('') },
+                  )
+                }
+              }}
+            >
+              <label htmlFor="cart-coupon-code">Código promocional</label>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  id="cart-coupon-code"
+                  name="coupon"
+                  type="text"
+                  required
+                  autoCapitalize="characters"
+                  autoComplete="off"
+                  spellCheck={false}
+                  readOnly={editCart.isPending}
+                  value={couponDraft}
+                  onChange={(event) => {
+                    setCouponDraft(event.currentTarget.value)
+                    if (couponError) editCart.reset()
+                  }}
+                  aria-describedby={
+                    couponError ? 'cart-coupon-error' : undefined
+                  }
+                  aria-invalid={invalidCoupon || undefined}
+                  className="h-8 min-w-0 flex-1 rounded-md border bg-background px-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                />
+                <Button
+                  type="submit"
+                  disabled={editCart.isPending || !couponDraft.trim()}
+                >
+                  Aplicar
+                </Button>
+              </div>
+
+              <div
+                role="status"
+                className={
+                  cart.data.couponCode === null ? 'sr-only' : undefined
+                }
+              >
+                {cart.data.couponCode !== null && (
+                  <p>Cupom aplicado: {cart.data.couponCode}</p>
+                )}
+              </div>
+              {cart.data.couponCode !== null && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-fit"
+                  disabled={editCart.isPending}
+                  onClick={() => editCart.mutate({ kind: 'remove-coupon' })}
+                >
+                  Remover cupom
+                </Button>
+              )}
+              {couponError && (
+                <p
+                  id="cart-coupon-error"
+                  role="alert"
+                  className="text-destructive"
+                >
+                  {couponError}
+                </p>
+              )}
+            </form>
+
             {removingItemId !== undefined ? (
-              <p className="mt-3">Atualizando subtotal…</p>
+              <p className="mt-3">Atualizando resumo…</p>
             ) : (
-              <dl className="mt-3">
-                <dt>Subtotal</dt>
-                <dd>{cart.data.subtotalEth.replace('.', ',')} ETH</dd>
+              <dl className="mt-4 grid gap-2 border-t pt-4">
+                <div className="flex flex-wrap justify-between gap-x-3">
+                  <dt>Subtotal</dt>
+                  <dd>{cart.data.subtotalEth.replace('.', ',')} ETH</dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-x-3">
+                  <dt>Desconto do lançamento</dt>
+                  <dd>
+                    {cart.data.discountEth !== '0' && '−'}
+                    {cart.data.discountEth.replace('.', ',')} ETH
+                  </dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-x-3">
+                  <dt>Taxa de rede</dt>
+                  <dd>{cart.data.networkFeeEth.replace('.', ',')} ETH</dd>
+                </div>
+                <div className="flex flex-wrap justify-between gap-x-3 border-t pt-2 font-semibold">
+                  <dt>Total</dt>
+                  <dd>{cart.data.totalEth.replace('.', ',')} ETH</dd>
+                </div>
               </dl>
             )}
           </aside>

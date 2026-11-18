@@ -18,13 +18,26 @@ export type CartItem = CartSelection & {
 export type CartResponse = {
   items: CartItem[]
   subtotalEth: string
+  discountEth: string
+  networkFeeEth: string
+  totalEth: string
+  couponCode: string | null
+  hasStockConflict: boolean
 }
 
 export const guestCartQueryKey = ['cart', 'guest'] as const
 
 function validateCart(data: CartResponse): CartResponse {
-  if (!Array.isArray(data?.items) || typeof data.subtotalEth !== 'string') {
-    throw new Error('A API retornou um carrinho inválido')
+  if (
+    !Array.isArray(data?.items) ||
+    typeof data.subtotalEth !== 'string' ||
+    typeof data.discountEth !== 'string' ||
+    typeof data.networkFeeEth !== 'string' ||
+    typeof data.totalEth !== 'string' ||
+    (data.couponCode !== null && typeof data.couponCode !== 'string') ||
+    typeof data.hasStockConflict !== 'boolean'
+  ) {
+    throw new Error('A API retornou uma cotação inválida')
   }
 
   return data
@@ -59,5 +72,15 @@ export async function removeCartItem(itemId: string): Promise<CartResponse> {
     `/cart/items/${encodeURIComponent(itemId)}`,
   )
 
+  return validateCart(data)
+}
+
+export async function applyCartCoupon(code: string): Promise<CartResponse> {
+  const { data } = await api.put<CartResponse>('/cart/coupon', { code })
+  return validateCart(data)
+}
+
+export async function removeCartCoupon(): Promise<CartResponse> {
+  const { data } = await api.delete<CartResponse>('/cart/coupon')
   return validateCart(data)
 }

@@ -8,11 +8,12 @@ Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Ku
 
 - Catálogo com busca por nome ou ID, filtros combináveis por coleção, rede e faixa de preço, ordenação e paginação. A URL guarda os filtros aplicados e a página.
 - Detalhe com acesso direto por URL, descrição da obra, coleção, atributos, rede, contrato, direitos autorais, seleção de edição e controle de quantidade por estoque.
-- Carrinho de visitante com inclusão, alteração de quantidade, remoção, subtotal e persistência após atualizar a página.
+- Carrinho de visitante com inclusão, alteração de quantidade, remoção e persistência após atualizar a página.
+- Cotação do carrinho pela API simulada, com subtotal, desconto, taxa de rede e total. O cupom aplicado é mantido após atualizar a página.
 - Remoção otimista no carrinho. A linha some enquanto a solicitação está pendente e reaparece se a API rejeitar a operação.
 - Estados de carregamento, lista vazia, erro e recurso inexistente.
 
-A aplicação está em desenvolvimento. A próxima parte do fluxo de compra é a cotação do carrinho com cupom e taxa de rede. Autenticação, favoritos, perfil, carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
+A próxima etapa é a autenticação, com cadastro, login, logout e preservação do carrinho de visitante ao entrar. Favoritos, perfil, carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
 
 ## Tecnologias
 
@@ -96,11 +97,20 @@ VITE_MOCK_CART_EDITS=error npm run dev:mocks
 3. Abra `/carrinho` e clique na lixeira.
 4. A linha some enquanto a operação está pendente. Após o HTTP `503`, a linha volta e a interface mostra o erro.
 
+### Reproduzir a cotação e os cupons
+
+1. Com o carrinho vazio, abra `/nfts/0042` e clique em **Comprar** com uma unidade na edição `1/10`.
+2. No carrinho, confirme o subtotal de `1,19 ETH`, a taxa de rede simulada de `0,016 ETH` e o total de `1,206 ETH`.
+3. Digite `KURIO10` em **Código promocional** e clique em **Aplicar**. O cupom concede 10% de desconto no subtotal, e o total passa a `1,087 ETH`.
+4. Atualize a página e aumente a quantidade para duas unidades. O total com desconto passa a `2,158 ETH`.
+5. Experimente `INVALIDO` ou `EXPIRADO10`. A API rejeita cada código com HTTP `422` e mantém o cupom aplicado. A interface informa se o código é inválido ou expirou.
+6. Clique em **Remover cupom** para voltar ao total de `2,396 ETH`.
+
 ### Restaurar o cenário padrão e limpar o carrinho
 
 Para restaurar as respostas padrão, reinicie o servidor com `npm run dev:mocks`, sem as variáveis de cenário.
 
-O mock guarda o carrinho de visitante no `localStorage` da origem atual. Para voltar ao carrinho vazio, execute no console do navegador:
+O mock guarda as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Para apagar os dois e voltar ao carrinho vazio, execute no console do navegador:
 
 ```js
 localStorage.removeItem('kurio:guest-cart:v1')
@@ -115,12 +125,14 @@ O servidor de desenvolvimento e o preview usam portas diferentes. Limpe a chave 
 | -------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `GET`    | `/api/nfts`               | Lista NFTs. Aceita `q`, `collection`, `network`, `minEth`, `maxEth`, `sort` e `page`. Retorna `items`, `total` e `pageSize`. |
 | `GET`    | `/api/nfts/:nftId`        | Retorna o detalhe e o estoque por edição. Um ID inexistente retorna HTTP `404` com o código `NFT_NOT_FOUND`.                 |
-| `GET`    | `/api/cart`               | Retorna os itens e o subtotal do carrinho de visitante.                                                                      |
+| `GET`    | `/api/cart`               | Retorna os itens e a cotação do carrinho de visitante, com subtotal, desconto, taxa de rede e total.                         |
 | `POST`   | `/api/cart/items`         | Recebe `nftId`, `editionId` e `quantity`. Soma à quantidade quando já existe uma linha para o mesmo NFT e edição.            |
 | `PATCH`  | `/api/cart/items/:itemId` | Recebe `{ quantity }` e define a quantidade final da linha.                                                                  |
 | `DELETE` | `/api/cart/items/:itemId` | Remove a linha e retorna o carrinho atualizado.                                                                              |
+| `PUT`    | `/api/cart/coupon`        | Recebe `{ code }`, aplica o cupom válido e retorna o carrinho com a cotação atualizada.                                      |
+| `DELETE` | `/api/cart/coupon`        | Remove o cupom e retorna o carrinho com a cotação atualizada.                                                                |
 
-Cada linha do carrinho representa um par de NFT e edição. O mock persiste os IDs e as quantidades e consulta as fixtures para montar os preços e o estoque. As quantidades são inteiras. Os valores em ETH trafegam como strings decimais, e os cálculos de preço usam `BigInt` em wei.
+Cada linha do carrinho representa um par de NFT e edição. O mock persiste os IDs, as quantidades e o código aplicado e consulta as fixtures para montar os preços e o estoque. A cotação é recalculada quando a quantidade, os itens ou o cupom mudam. As quantidades são inteiras. Os valores em ETH trafegam como strings decimais, e os cálculos de preço usam `BigInt` em wei.
 
 ## Organização e cache
 
@@ -156,7 +168,7 @@ Execute os testes:
 npm run test:e2e
 ```
 
-O Playwright inicia o Vite com mocks na porta `4175` e executa os casos em Chromium desktop (`1440 × 900`) e mobile (`390 × 844`). A cobertura atual verifica acesso direto ao detalhe, refresh, NFT inexistente, adição ao carrinho, alteração de quantidade, remoção e persistência.
+O Playwright inicia o Vite com mocks na porta `4175` e executa os casos em Chromium desktop (`1440 × 900`) e mobile (`390 × 844`). A cobertura atual verifica acesso direto ao detalhe, NFT inexistente, persistência após refresh, adição, alteração de quantidade e remoção no carrinho, recálculo da cotação, aplicação e remoção de cupom e rejeição de cupons inválidos ou expirados.
 
 Abra o relatório HTML com:
 
