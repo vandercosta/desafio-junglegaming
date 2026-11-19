@@ -4,6 +4,7 @@ import axios from 'axios'
 import { Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { useRealtime } from '@/features/realtime/realtime-context'
 import {
   applyCartCoupon,
   getCart,
@@ -39,6 +40,8 @@ export default function CartPage() {
 function ScopedCart({ scope }: { scope: CartScope }) {
   const search = useSearch({ from: '/carrinho' })
   const [couponDraft, setCouponDraft] = useState('')
+  const { lastNftUpdate } = useRealtime()
+  const [initialEventId] = useState(lastNftUpdate?.eventId)
 
   const queryKey = cartQueryKey(scope)
   const cart = useQuery({
@@ -46,6 +49,11 @@ function ScopedCart({ scope }: { scope: CartScope }) {
     queryFn: ({ signal }) => getCart(scope, signal),
     retry: false,
   })
+
+  const updatedItem =
+    lastNftUpdate && lastNftUpdate.eventId !== initialEventId && !cart.isError
+      ? cart.data?.items.find((item) => item.nftId === lastNftUpdate.nftId)
+      : undefined
 
   const queryClient = useQueryClient()
 
@@ -107,6 +115,13 @@ function ScopedCart({ scope }: { scope: CartScope }) {
       <h1 className="text-2xl font-semibold">Carrinho</h1>
 
       {editCart.isPending && <p role="status">Atualizando carrinho…</p>}
+
+      <div role="status" className={updatedItem ? 'text-sm' : 'sr-only'}>
+        {updatedItem &&
+          (cart.isFetching
+            ? `Preço ou disponibilidade de ${updatedItem.nftName} mudou. Atualizando o carrinho…`
+            : `O carrinho foi atualizado. Confira o preço e a disponibilidade de ${updatedItem.nftName}.`)}
+      </div>
 
       {editCart.isError && !isCouponChange && (
         <p role="alert">
@@ -343,7 +358,12 @@ function ScopedCart({ scope }: { scope: CartScope }) {
               <Link
                 to="/pagamento"
                 search={search}
-                disabled={editCart.isPending || cart.data.hasStockConflict}
+                disabled={
+                  editCart.isPending ||
+                  cart.isFetching ||
+                  cart.isError ||
+                  cart.data.hasStockConflict
+                }
               >
                 Conectar e finalizar
               </Link>

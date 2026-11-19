@@ -27,6 +27,7 @@ import { favoritesQueriesKey } from '@/features/favorites/favorites-api'
 import { profileQueriesKey } from '@/features/profile/profile-api'
 import { walletsQueriesKey } from '@/features/wallets/wallets-api'
 import { checkoutQueriesKey } from '@/features/checkout/checkout-api'
+import RealtimeProvider from '@/features/realtime/realtime-provider'
 
 export default function SessionLayout() {
   const authMode = useLocation({
@@ -229,7 +230,13 @@ export default function SessionLayout() {
         {logout.isError && <p role="alert">Não foi possível sair da conta.</p>}
       </header>
 
-      <Outlet />
+      <RealtimeProvider
+        userId={
+          sessionQuery.data === undefined ? undefined : (user?.id ?? null)
+        }
+      >
+        <Outlet />
+      </RealtimeProvider>
 
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />

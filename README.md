@@ -18,9 +18,10 @@ Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Ku
 - Perfil do colecionador com edição de dados, avatar e alteração de senha.
 - Cadastro e edição de carteiras principal e secundária, com validação por rede e persistência por conta.
 - Checkout simulado com revisão da cotação, conexão de carteira, pedidos recuperáveis e recibo de compras confirmadas.
+- Atualização de preço, estoque e pedidos por Socket.IO, com reconciliação via REST após reconectar.
 - Estados de carregamento, lista vazia, erro e recurso inexistente.
 
-Eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
+O refinamento visual e as auditorias finais fazem parte da entrega em andamento.
 
 ## Tecnologias
 
@@ -169,6 +170,34 @@ localStorage.setItem('kurio:mock-checkout-scenario:v1', 'refused')
 
 Cada cenário é consumido uma vez. O preço alterado continua valendo até restaurar os dados simulados. O recibo usa os dados e valores gravados no pedido.
 
+## Atualizações em tempo real
+
+O cabeçalho mostra o estado do Socket.IO. Para simular uma mudança com o carrinho aberto, adicione o NFT `0042`, abra o console do navegador e execute os comandos abaixo no modo de demonstração.
+
+```js
+const realtime = (action) =>
+  fetch('/api/demo/realtime', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(action),
+  })
+
+await realtime({ action: 'change-nft', nftId: '0042', priceEth: '1.40' })
+```
+
+O carrinho anuncia a atualização e mostra o total recalculado. Para conferir a proteção durante o checkout, faça a revisão da compra e execute o comando novamente com outro preço. A tela mostra o novo valor e exige **Voltar à revisão** antes de confirmar.
+
+| Ação de demonstração | Campos                                                       | Comportamento                                                                                               |
+| -------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `change-nft`         | `nftId`, `priceEth` e/ou `editionId` com `availableQuantity` | Altera o estado usado pela REST e publica `nft.updated`. Use `limited-10` e `0` para esgotar a edição 1/10. |
+| `replay-nft`         | `nftId`, `stale` opcional                                    | Reenvia o evento atual. Com `stale: true`, envia a versão anterior, quando disponível.                      |
+| `delay-next-order`   | `durationMs`                                                 | Define por quanto tempo o próximo pedido novo fica pendente.                                                |
+| `disconnect`         | `durationMs`                                                 | Interrompe o WebSocket desta aba e permite a reconexão após o intervalo.                                    |
+
+Para testar uma desconexão durante um pedido pendente, use `await realtime({ action: 'delay-next-order', durationMs: 5000 })` antes de confirmar. Quando aparecer **Pedido pendente**, use `await realtime({ action: 'disconnect', durationMs: 6000 })`. A página recupera o mesmo pedido pela API, e o recibo continua acessível após recarregar.
+
+Os eventos são simulados com `@mswjs/socket.io-binding` no modo de demonstração. Consulte o [contrato e as limitações do transporte](./ARCHITECTURE.md#tempo-real).
+
 ## Cenários da API simulada
 
 | Variável               | Valor   | Comportamento                                             |
@@ -301,6 +330,7 @@ src/
     catalog/    Contratos, filtros e tela de detalhe
     cart/       Contrato e tela do carrinho
     checkout/   Revisão, envio do pedido e recibo
+    realtime/   Transporte, eventos e reconciliação
   lib/          Cliente Axios e conversões de ETH
   mocks/        Handlers REST e fixtures
   routes/       Rotas do TanStack Router
@@ -320,7 +350,7 @@ O perfil usa `['profile', userId]`. Ao salvar, o cache recebe o perfil confirmad
 
 As carteiras usam `['wallets', userId]`. A API retorna o estado completo após salvar. Na troca de conta, as consultas e mutations do usuário anterior saem do cache.
 
-O checkout usa chaves com o ID da conta. A tela consulta o estado de um pedido pendente pela API REST e atualiza o cache do carrinho após a confirmação. O rascunho de pagamento e a tentativa ainda em andamento ficam associados à conta em `sessionStorage` para retomar o fluxo na mesma aba.
+O checkout usa chaves com o ID da conta. A tela usa os eventos do pedido para reconsultar a API REST. A consulta periódica atende a tela quando o Socket.IO está indisponível. O cache do carrinho é atualizado após a confirmação. O rascunho de pagamento e a tentativa ainda em andamento ficam associados à conta em `sessionStorage` para retomar o fluxo na mesma aba.
 
 A sessão usa a chave `['session']`. Na troca de carrinho, as queries e mutations em cache do carrinho anterior são removidas. Após login ou logout, as consultas de sessão pendentes são canceladas e o cache recebe o estado confirmado pela API.
 
@@ -370,6 +400,12 @@ Para verificar a revisão da compra, a confirmação e as falhas de pagamento, e
 
 ```bash
 npm run test:e2e -- checkout.spec.ts
+```
+
+Para testar mudanças de preço e estoque, mensagens repetidas, reconexão com pedido pendente e isolamento entre contas, execute a suíte de tempo real.
+
+```bash
+npm run test:e2e -- realtime.spec.ts
 ```
 
 Abra o relatório HTML com:

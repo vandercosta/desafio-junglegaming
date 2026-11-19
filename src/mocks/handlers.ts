@@ -12,6 +12,7 @@ import { favoritesHandlers } from './favorites-handlers'
 import { profileHandlers } from './profile-handlers'
 import { walletHandlers } from './wallet-handlers'
 import { checkoutHandlers } from './checkout-handlers'
+import { realtimeHandlers } from './realtime-handlers'
 
 const PAGE_SIZE = 3
 
@@ -119,4 +120,5 @@ export const handlers = [
   ...profileHandlers,
   ...walletHandlers,
   ...checkoutHandlers,
+  ...realtimeHandlers,
 ]

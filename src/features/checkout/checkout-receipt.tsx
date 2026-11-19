@@ -8,6 +8,7 @@ import { parseCatalogSearch } from '@/features/catalog/catalog-search'
 import { favoritesQueryKey } from '@/features/favorites/favorites-api'
 import { walletNetworks, walletProviders } from '@/features/wallets/wallets-api'
 import { Button } from '@/components/ui/button'
+import { useRealtime } from '@/features/realtime/realtime-context'
 import { checkoutQueryKey, getOrder } from './checkout-api'
 import CheckoutSummary from './checkout-summary'
 import { refreshCheckoutSession } from './checkout-session'
@@ -32,13 +33,16 @@ export default function CheckoutReceipt({
   const search = useSearch({ from: '/pagamento' })
   const cartSearch = parseCatalogSearch(search)
   const queryClient = useQueryClient()
+  const { status } = useRealtime()
   const query = useQuery({
     queryKey: checkoutQueryKey(userId, 'order', orderId),
     queryFn: ({ signal }) => getOrder(userId, orderId, signal),
     retry: false,
     refetchInterval: ({ state }) =>
       state.data?.status === 'pending' && state.status !== 'error'
-        ? 650
+        ? status === 'online'
+          ? false
+          : 4_000
         : false,
   })
   const order = query.data

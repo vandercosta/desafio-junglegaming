@@ -1,4 +1,5 @@
-import { readCheckoutStore } from './cart-store'
+import type { NftUpdatedEvent } from '@/features/realtime/realtime-contract'
+import { readCheckoutStore, type CheckoutStore } from './cart-store'
 import { nftEditions, nfts } from './fixtures/nfts'
 
 export function readCatalog(checkout = readCheckoutStore()) {
@@ -20,14 +21,55 @@ export function readCatalog(checkout = readCheckoutStore()) {
       ...nft,
       priceEth: checkout.prices[nft.id] ?? nft.priceEth,
     })),
+    soldQuantity(nftId: string, editionId: string) {
+      return sold.get(`${nftId}:${editionId}`) ?? 0
+    },
     editionsFor(nftId: string) {
       return nftEditions.map((edition) => ({
         ...edition,
         availableQuantity: Math.max(
           0,
-          edition.availableQuantity - (sold.get(`${nftId}:${edition.id}`) ?? 0),
+          (checkout.stock[nftId]?.[edition.id] ?? edition.availableQuantity) -
+            (sold.get(`${nftId}:${edition.id}`) ?? 0),
         ),
       }))
     },
   }
+}
+
+export function nftEvent(
+  nftId: string,
+  checkout: CheckoutStore,
+  catalog = readCatalog(checkout),
+): NftUpdatedEvent | undefined {
+  const nft = catalog.nfts.find(({ id }) => id === nftId)
+  if (!nft) return undefined
+
+  const version = checkout.nftVersions[nftId] ?? 1
+  return {
+    eventId: `nft:${nftId}:${version}`,
+    nftId,
+    version,
+    priceEth: nft.priceEth,
+    editions: catalog.editionsFor(nftId),
+  }
+}
+
+export function bumpNftVersions(
+  previous: CheckoutStore,
+  next: CheckoutStore,
+  nftIds: readonly string[],
+): CheckoutStore {
+  const catalog = readCatalog(previous)
+  const nftVersions = { ...next.nftVersions }
+  const previousNfts = { ...next.previousNfts }
+
+  for (const nftId of nftIds) {
+    const old = nftEvent(nftId, previous, catalog)
+    if (!old) continue
+    nftVersions[nftId] = old.version + 1
+    previousNfts[nftId] = old
+  }
+
+  return { ...next, nftVersions, previousNfts }
 }

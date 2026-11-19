@@ -1,5 +1,6 @@
 import type { CartScope, CartSelection } from '@/features/cart/cart-api'
 import type { Order } from '@/features/checkout/checkout-api'
+import type { NftUpdatedEvent } from '@/features/realtime/realtime-contract'
 
 const cartsKey = 'kurio:carts:v1'
 const legacyGuestKey = 'kurio:guest-cart:v1'
@@ -25,6 +26,9 @@ export type StoredOrder = {
 export type CheckoutStore = {
   orders: Record<string, StoredOrder[]>
   prices: Record<string, string>
+  stock: Record<string, Record<string, number>>
+  nftVersions: Record<string, number>
+  previousNfts: Record<string, NftUpdatedEvent>
 }
 
 export function isCartSelection(value: unknown): value is CartSelection {
@@ -90,7 +94,13 @@ export function readCheckoutStore(): CheckoutStore {
   const checkout = readCarts()[checkoutField] as
     Partial<CheckoutStore> | undefined
 
-  return { orders: checkout?.orders ?? {}, prices: checkout?.prices ?? {} }
+  return {
+    orders: checkout?.orders ?? {},
+    prices: checkout?.prices ?? {},
+    stock: checkout?.stock ?? {},
+    nftVersions: checkout?.nftVersions ?? {},
+    previousNfts: checkout?.previousNfts ?? {},
+  }
 }
 
 export function writeCheckoutStore(

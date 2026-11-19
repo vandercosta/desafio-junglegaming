@@ -174,12 +174,27 @@ export default function CheckoutForm(props: FormProps) {
   }
 
   return (
-    <CheckoutComposer
-      {...props}
-      profile={profile.data}
-      options={options}
-      quote={quote.data}
-    />
+    <>
+      {quote.isError && (
+        <div className="grid justify-items-start gap-3">
+          <p role="alert">Não foi possível conferir a cotação atual.</p>
+          <Button
+            type="button"
+            disabled={quote.isFetching}
+            onClick={() => void quote.refetch()}
+          >
+            Atualizar cotação
+          </Button>
+        </div>
+      )}
+      <CheckoutComposer
+        {...props}
+        profile={profile.data}
+        options={options}
+        quote={quote.data}
+        checkingQuote={quote.isFetching || quote.isError}
+      />
+    </>
   )
 }
 
@@ -247,10 +262,12 @@ function CheckoutComposer({
   profile,
   options,
   quote,
+  checkingQuote,
 }: FormProps & {
   profile: Profile
   options: WalletOption[]
   quote: CheckoutQuote
+  checkingQuote: boolean
 }) {
   const queryClient = useQueryClient()
   const search = useSearch({ from: '/pagamento' })
@@ -399,7 +416,7 @@ function CheckoutComposer({
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                disabled={reviewedQuoteChanged}
+                disabled={reviewedQuoteChanged || checkingQuote}
                 onClick={() => {
                   setReview(null)
                   onConfirm(review.input)
@@ -424,7 +441,8 @@ function CheckoutComposer({
               if (
                 !selected ||
                 connection.data?.status !== 'connected' ||
-                !connectionAccepted
+                !connectionAccepted ||
+                checkingQuote
               )
                 return
 
@@ -662,7 +680,9 @@ function CheckoutComposer({
             <Button
               type="submit"
               className="w-fit"
-              disabled={!connectionAccepted || changingConnection}
+              disabled={
+                !connectionAccepted || changingConnection || checkingQuote
+              }
             >
               Revisar compra
             </Button>
@@ -670,10 +690,7 @@ function CheckoutComposer({
         )}
       </div>
       <aside className="grid min-w-0 content-start gap-3 rounded-md border p-4">
-        <CheckoutSummary
-          cart={review?.quote.cart ?? quote.cart}
-          label="Seus NFTs"
-        />
+        <CheckoutSummary cart={quote.cart} label="Seus NFTs" />
         <Link to="/carrinho" search={cartSearch} className="text-sm underline">
           Editar itens ou código promocional
         </Link>

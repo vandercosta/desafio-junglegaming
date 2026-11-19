@@ -14,7 +14,8 @@ import { walletNetworks, type Wallet } from '@/features/wallets/wallets-api'
 import { fromWei, toWei } from '@/lib/eth'
 import { getMockUserId } from './auth-handlers'
 import { buildCart } from './cart-handlers'
-import { readCatalog } from './catalog-state'
+import { bumpNftVersions, readCatalog } from './catalog-state'
+import { publishNftChanges, publishOrder } from './realtime-socket'
 import {
   cartStorageLock,
   readCart,
@@ -29,6 +30,8 @@ const scenarioKey = 'kurio:mock-checkout-scenario:v1'
 const connectionPrefix = 'kurio:checkout-connection:v1:'
 const connectionDurationMs = 30 * 60 * 1000
 const processingDurationMs = 1_500
+const pendingTimers = new Map<string, number>()
+let nextMockOrderDelay: number | undefined
 
 type StoredConnection = CheckoutConnectionInput & {
   id: string
@@ -239,6 +242,7 @@ function settleOrder(
 
   if (!confirmed) {
     writeCheckoutStore(nextCheckout)
+    publishOrder(userId, next)
     return next
   }
 
@@ -255,8 +259,49 @@ function settleOrder(
   const couponCode = selections.length ? currentCart.couponCode : null
 
   // A receipt and its cart/stock effects become durable in the same write.
-  writeCheckoutStore(nextCheckout, { scope, cart: { selections, couponCode } })
+  const nftIds = [...new Set(order.quote.items.map((item) => item.nftId))]
+  const updated = bumpNftVersions(checkout, nextCheckout, nftIds)
+  writeCheckoutStore(updated, { scope, cart: { selections, couponCode } })
+  publishNftChanges(updated, nftIds)
+  publishOrder(userId, next)
   return next
+}
+
+export function delayNextMockOrder(durationMs: number) {
+  nextMockOrderDelay = durationMs
+}
+
+function scheduleMockOrder(userId: string, record: StoredOrder) {
+  const orderId = record.order.id
+  if (record.order.status !== 'pending' || pendingTimers.has(orderId)) return
+
+  const timer = window.setTimeout(
+    () => {
+      pendingTimers.delete(orderId)
+      void navigator.locks
+        .request(cartStorageLock, () => {
+          const checkout = readCheckoutStore()
+          const current = checkout.orders[userId]?.find(
+            (item) => item.order.id === orderId,
+          )
+          if (!current) return
+          const order = settleOrder(userId, current, checkout)
+          if (order.status === 'pending') scheduleMockOrder(userId, current)
+        })
+        .catch(() => {
+          // The status remains recoverable by the next authoritative REST request.
+        })
+    },
+    Math.max(0, record.readyAt - Date.now()),
+  )
+
+  pendingTimers.set(orderId, timer)
+}
+
+export function resumeMockOrders(userId: string) {
+  for (const record of readCheckoutStore().orders[userId] ?? []) {
+    scheduleMockOrder(userId, record)
+  }
 }
 
 export const checkoutHandlers = [
@@ -404,13 +449,22 @@ export const checkoutHandlers = [
 
       if (scenario === 'quote-changed') {
         const first = quote.cart.items[0]
-        checkout.prices[first.nftId] = fromWei(
-          toWei(first.unitPriceEth) + toWei('0.1'),
+        const updated = bumpNftVersions(
+          checkout,
+          {
+            ...checkout,
+            prices: {
+              ...checkout.prices,
+              [first.nftId]: fromWei(toWei(first.unitPriceEth) + toWei('0.1')),
+            },
+          },
+          [first.nftId],
         )
-        writeCheckoutStore(checkout)
+        writeCheckoutStore(updated)
+        publishNftChanges(updated, [first.nftId])
         localStorage.removeItem(scenarioKey)
         return checkoutError(409, 'QUOTE_CHANGED', {
-          quote: await buildQuote(userId, checkout),
+          quote: await buildQuote(userId, updated),
         })
       }
 
@@ -425,17 +479,18 @@ export const checkoutHandlers = [
         wallet,
         collector,
       }
-      checkout.orders[userId] = [
-        ...records,
-        {
-          order,
-          fingerprint: hash,
-          idempotencyKey: key,
-          readyAt: createdAt + processingDurationMs,
-          outcome: scenario === 'refused' ? 'refused' : 'confirmed',
-        },
-      ]
+      const record: StoredOrder = {
+        order,
+        fingerprint: hash,
+        idempotencyKey: key,
+        readyAt: createdAt + (nextMockOrderDelay ?? processingDurationMs),
+        outcome: scenario === 'refused' ? 'refused' : 'confirmed',
+      }
+      checkout.orders[userId] = [...records, record]
       writeCheckoutStore(checkout)
+      nextMockOrderDelay = undefined
+      scheduleMockOrder(userId, record)
+      publishOrder(userId, order)
 
       if (scenario === 'timeout' || scenario === 'refused')
         localStorage.removeItem(scenarioKey)
@@ -455,7 +510,9 @@ export const checkoutHandlers = [
       )
       if (!record) return checkoutError(404, 'ORDER_NOT_FOUND')
 
-      return HttpResponse.json(settleOrder(userId, record, checkout))
+      const order = settleOrder(userId, record, checkout)
+      if (order.status === 'pending') scheduleMockOrder(userId, record)
+      return HttpResponse.json(order)
     })
   }),
 ]
