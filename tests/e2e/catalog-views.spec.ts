@@ -11,7 +11,8 @@ test('sorts from the toolbar on desktop and the filter panel on mobile', async (
     await expect(sort).toBeHidden()
     await expect(page.getByRole('complementary')).toBeHidden()
     await page.getByRole('button', { name: 'Abrir filtros' }).click()
-    await sort.selectOption('price-desc')
+    await sort.click()
+    await page.getByRole('option', { name: 'Maior preço', exact: true }).click()
     await page.getByRole('button', { name: 'Aplicar' }).click()
   } else {
     await sort.selectOption('price-desc')

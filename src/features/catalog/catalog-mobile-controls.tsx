@@ -73,7 +73,7 @@ export default function CatalogMobileControls() {
         </Dialog.Trigger>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
-          <Dialog.Content className="fixed inset-x-3 bottom-3 z-50 mx-auto max-h-[calc(100dvh-1.5rem)] max-w-lg overflow-y-auto rounded-2xl border bg-card p-5 text-card-foreground">
+          <Dialog.Content className="fixed inset-x-2 top-[92px] z-50 mx-auto max-h-[calc(100dvh-100px)] max-w-lg overflow-y-auto rounded-2xl border bg-card p-5 text-card-foreground">
             <div className="flex items-center justify-between gap-2">
               <Dialog.Title className="text-lg font-semibold">
                 Filtros do catálogo

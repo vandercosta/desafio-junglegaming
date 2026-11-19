@@ -1,4 +1,6 @@
-import type { SubmitEvent } from 'react'
+import { ChevronDown } from 'lucide-react'
+import { Select } from 'radix-ui'
+import { useId, type SubmitEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { catalogOptions, parseCatalogSearch } from './catalog-search'
 import type { CatalogSearch } from './catalog-search'
@@ -23,6 +25,7 @@ const fieldClassName =
   'min-w-0 rounded-md border border-input bg-background p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 
 export default function CatalogFilters({ search, onApply }: Props) {
+  const labelId = useId()
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     const fields = new FormData(event.currentTarget)
@@ -38,22 +41,47 @@ export default function CatalogFilters({ search, onApply }: Props) {
   return (
     <form onSubmit={handleSubmit} className="my-4 grid gap-4 sm:grid-cols-2">
       {selects.map(({ name, label, empty }) => (
-        <label key={name} className="grid gap-1">
-          {label}
-          <select
-            key={search[name] ?? ''}
+        <div key={name} className="grid min-w-0 gap-1">
+          <span id={`${labelId}-${name}`}>{label}</span>
+          <Select.Root
+            key={search[name] ?? 'default'}
             name={name}
-            defaultValue={search[name] ?? ''}
-            className={fieldClassName}
+            defaultValue={search[name] ?? 'default'}
           >
-            <option value="">{empty}</option>
-            {Object.entries(catalogOptions[name]).map(([value, text]) => (
-              <option key={value} value={value}>
-                {text}
-              </option>
-            ))}
-          </select>
-        </label>
+            <Select.Trigger
+              aria-labelledby={`${labelId}-${name}`}
+              className={`${fieldClassName} flex min-h-11 w-full items-center justify-between gap-2 text-left`}
+            >
+              <Select.Value />
+              <Select.Icon asChild>
+                <ChevronDown className="size-4 shrink-0" />
+              </Select.Icon>
+            </Select.Trigger>
+            <Select.Portal>
+              <Select.Content
+                position="popper"
+                side="bottom"
+                sideOffset={4}
+                className="z-60 w-(--radix-select-trigger-width) max-h-(--radix-select-content-available-height) overflow-y-auto rounded-md border border-input bg-card text-card-foreground shadow-lg"
+              >
+                <Select.Viewport className="p-1">
+                  {[
+                    ['default', empty],
+                    ...Object.entries(catalogOptions[name]),
+                  ].map(([value, text]) => (
+                    <Select.Item
+                      key={value}
+                      value={value}
+                      className="flex min-h-11 cursor-pointer items-center rounded-sm px-3 outline-none data-highlighted:bg-accent data-[state=checked]:text-primary"
+                    >
+                      <Select.ItemText>{text}</Select.ItemText>
+                    </Select.Item>
+                  ))}
+                </Select.Viewport>
+              </Select.Content>
+            </Select.Portal>
+          </Select.Root>
+        </div>
       ))}
 
       {prices.map(({ name, label }) => (
