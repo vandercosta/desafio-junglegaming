@@ -27,9 +27,12 @@ export default function WalletsPage() {
   return (
     <section
       aria-labelledby="wallets-heading"
-      className="grid min-w-0 content-start gap-6"
+      className="grid min-w-0 content-start gap-8 font-mono"
     >
-      <h1 id="wallets-heading" className="text-2xl font-semibold">
+      <h1
+        id="wallets-heading"
+        className={userId ? 'sr-only' : 'text-lg font-bold'}
+      >
         Carteiras
       </h1>
       {userId ? (
@@ -126,11 +129,33 @@ function AccountWallets({ userId }: { userId: string }) {
           <section
             key={id}
             aria-labelledby={`wallet-heading-${id}`}
-            className="grid gap-3 border-t pt-4"
+            className="grid min-w-0 gap-4"
           >
-            <h2 id={`wallet-heading-${id}`} className="text-lg font-semibold">
-              {title}
-            </h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id={`wallet-heading-${id}`} className="text-lg font-bold">
+                {title}
+              </h2>
+              {editing !== id && (
+                <button
+                  type="button"
+                  className="cursor-pointer text-[15px] font-bold text-text-accent hover:underline disabled:cursor-default disabled:opacity-50"
+                  disabled={editing !== null}
+                  aria-label={wallet ? 'Editar carteira' : 'Adicionar carteira'}
+                  onClick={() => {
+                    save.reset()
+                    setEditing(id)
+                  }}
+                >
+                  {wallet ? 'Editar' : 'Adicionar'}
+                </button>
+              )}
+            </div>
+            {id === 'principal' && (
+              <p className="text-sm text-muted-foreground">
+                Estas carteiras ficam disponíveis no pagamento e para receber
+                NFTs comprados.
+              </p>
+            )}
             {editing === id ? (
               <WalletForm
                 slot={id}
@@ -157,20 +182,10 @@ function AccountWallets({ userId }: { userId: string }) {
                 {wallet ? (
                   <WalletSummary wallet={wallet} />
                 ) : (
-                  <p>Nenhuma carteira cadastrada.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Nenhuma carteira cadastrada.
+                  </p>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-fit"
-                  disabled={editing !== null}
-                  onClick={() => {
-                    save.reset()
-                    setEditing(id)
-                  }}
-                >
-                  {wallet ? 'Editar carteira' : 'Adicionar carteira'}
-                </Button>
               </>
             )}
           </section>
@@ -182,7 +197,7 @@ function AccountWallets({ userId }: { userId: string }) {
 
 function WalletSummary({ wallet }: { wallet: Wallet }) {
   return (
-    <dl className="grid min-w-0 gap-3 rounded-md border p-3 sm:grid-cols-2">
+    <dl className="grid min-w-0 gap-3 rounded-md border bg-surface-card p-4 sm:grid-cols-2">
       <div>
         <dt>Apelido da carteira</dt>
         <dd className="wrap-anywhere">{wallet.nickname}</dd>

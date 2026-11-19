@@ -71,6 +71,7 @@ export default function WalletForm({
           <label className="flex w-fit items-center gap-2">
             <input
               type="checkbox"
+              className="size-4 accent-primary"
               checked={same}
               onChange={(event) => setSame(event.currentTarget.checked)}
             />
@@ -80,9 +81,10 @@ export default function WalletForm({
 
         <fieldset
           disabled={same}
-          className={same ? 'hidden' : 'grid gap-4 sm:grid-cols-2'}
+          className={same ? 'hidden' : 'grid gap-x-7 gap-y-6 sm:grid-cols-2'}
         >
           <ProfileField
+            collector
             id={`${prefix}-nickname`}
             label="Apelido da carteira"
             name="nickname"
@@ -101,6 +103,7 @@ export default function WalletForm({
             error={!same ? errors?.network : undefined}
           />
           <ProfileField
+            collector
             id={`${prefix}-address`}
             label="Endereço da carteira"
             name="address"
@@ -125,6 +128,7 @@ export default function WalletForm({
             error={!same ? errors?.provider : undefined}
           />
           <ProfileField
+            collector
             id={`${prefix}-ens`}
             label="Nome ENS (opcional)"
             name="ensName"
@@ -133,6 +137,7 @@ export default function WalletForm({
             suffix=".eth"
           />
           <ProfileField
+            collector
             id={`${prefix}-referral`}
             label="Código de indicação (opcional)"
             name="referralCode"
@@ -146,10 +151,18 @@ export default function WalletForm({
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button type="submit">
+          <Button
+            type="submit"
+            className="h-10 cursor-pointer rounded-[3px] text-[15px] font-bold"
+          >
             {pending ? 'Salvando…' : 'Salvar carteira'}
           </Button>
-          <Button type="button" variant="outline" onClick={onCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            className="h-10 cursor-pointer"
+          >
             Cancelar
           </Button>
         </div>
@@ -181,7 +194,12 @@ function WalletSelect({
 }) {
   return (
     <div className="grid min-w-0 content-start gap-1">
-      <label htmlFor={id}>{label}</label>
+      <div className="text-[15px]">
+        <label htmlFor={id}>{label}</label>
+        <span aria-hidden="true" className="ml-1 text-[#f0805f]">
+          *
+        </span>
+      </div>
       <select
         id={id}
         name={name}
@@ -193,7 +211,7 @@ function WalletSelect({
         }
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : undefined}
-        className="rounded-md border bg-background p-2 focus-visible:outline-2 focus-visible:outline-ring"
+        className="h-10 min-w-0 rounded-[3px] border bg-background px-3 text-[15px] invalid:text-metadata-foreground focus-visible:border-primary focus-visible:outline-none"
       >
         <option value="">{placeholder}</option>
         {Object.entries(options).map(([key, text]) => (

@@ -1,4 +1,3 @@
-import type { Wallet } from '@/features/wallets/wallets-api'
 import type {
   CheckoutWalletSlot,
   CollectorInput,
@@ -8,7 +7,6 @@ import type {
 export type CheckoutDraft = {
   collector: CollectorInput
   walletSlot: CheckoutWalletSlot | ''
-  network: Wallet['network'] | ''
 }
 
 export type CheckoutAttempt = {

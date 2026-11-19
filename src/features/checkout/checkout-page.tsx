@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
 import axios from 'axios'
+import { ChevronLeft } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import {
   sessionQueryKey,
@@ -35,22 +36,34 @@ export default function CheckoutPage() {
   const userId = session.data?.session?.user.id
 
   return (
-    <main className="page-shell grid gap-5 py-6">
+    <main className="page-shell grid gap-6 py-6 font-mono lg:gap-8 lg:pt-8">
       <nav
         aria-label="Caminho da página"
-        className="flex flex-wrap gap-2 text-sm"
+        className="hidden flex-wrap gap-2 text-[15px] font-bold lg:flex"
       >
         <Link to="/" search={cartSearch} className="underline">
           Início
         </Link>
         <span aria-hidden="true">/</span>
-        <Link to="/carrinho" search={cartSearch} className="underline">
-          Carrinho
+        <Link to="/" hash="catalogo" search={cartSearch} className="underline">
+          Mercado
         </Link>
         <span aria-hidden="true">/</span>
         <span aria-current="page">Pagamento</span>
       </nav>
-      <h1 className="text-2xl font-semibold">Pagamento</h1>
+      <div className="grid grid-cols-[36px_1fr] items-center gap-2 lg:sr-only">
+        <Link
+          to="/carrinho"
+          search={cartSearch}
+          aria-label="Voltar para o carrinho"
+          className="grid size-9 place-items-center rounded-full border bg-[#2f1d15] text-metadata-foreground hover:text-text-accent lg:hidden"
+        >
+          <ChevronLeft aria-hidden="true" className="size-5" />
+        </Link>
+        <h1 className="text-center text-xl/6 font-bold">
+          Pagamento com carteira
+        </h1>
+      </div>
       {userId ? (
         <AccountCheckout
           key={`${userId}:${search.pedido ?? ''}`}

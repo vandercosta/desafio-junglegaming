@@ -10,3 +10,7 @@ export function fromWei(value: bigint): string {
 
   return fraction ? `${whole}.${fraction}` : whole
 }
+
+export function formatEth(decimal: string): string {
+  return `${decimal.replace('.', ',')} ETH`
+}

@@ -34,9 +34,9 @@ async function registerWallet(page: Page) {
   ).toBeVisible()
 }
 
-async function seedWallet(page: Page) {
+async function seedWallet(page: Page, includeSecondary = false) {
   await page.addInitScript(
-    ({ nickname, address }) => {
+    ({ nickname, address, includeSecondary }) => {
       const key = 'kurio:wallets:v1:user-ana'
       if (localStorage.getItem(key) !== null) return
 
@@ -51,11 +51,23 @@ async function seedWallet(page: Page) {
             ensName: '',
             referralCode: '',
           },
-          secondary: null,
+          secondary: includeSecondary
+            ? {
+                kind: 'independent',
+                wallet: {
+                  nickname: 'Reserva',
+                  address: '0x2222222222222222222222222222222222222222',
+                  network: 'polygon',
+                  provider: 'coinbase',
+                  ensName: 'reserva',
+                  referralCode: '',
+                },
+              }
+            : null,
         }),
       )
     },
-    { nickname: walletNickname, address: walletAddress },
+    { nickname: walletNickname, address: walletAddress, includeSecondary },
   )
 }
 
@@ -104,10 +116,16 @@ async function setScenario(
 
 test('finishes a guest purchase after sign-in and restores the confirmed receipt', async ({
   page,
+  isMobile,
 }) => {
   await page.clock.setFixedTime(new Date('2026-01-01T12:00:00Z'))
   await registerWallet(page)
   await goToCheckout(page)
+  if (isMobile) {
+    await page
+      .getByRole('button', { name: 'Editar dados do colecionador' })
+      .click()
+  }
   await expect(page.getByLabel('Nome de exibição')).toHaveValue('Ana Demo')
 
   const submissions: string[] = []
@@ -340,4 +358,25 @@ test('requires a new review before accepting a changed quote', async ({
   await expect(
     page.getByRole('heading', { name: 'Pedido confirmado' }),
   ).toBeVisible()
+})
+
+test('selects a saved wallet through its provider and restores the selection', async ({
+  page,
+}) => {
+  await seedWallet(page, true)
+  await goToCheckout(page)
+
+  const principal = page.getByRole('radio', { name: /Principal Ana/ })
+  const secondary = page.getByRole('radio', { name: /Reserva/ })
+  const coinbase = page.getByRole('radio', { name: 'Coinbase Wallet' })
+  await expect(principal).toBeChecked()
+  await expect(
+    page.getByRole('radio', { name: 'WalletConnect' }),
+  ).toBeDisabled()
+  await coinbase.check()
+  await expect(secondary).toBeChecked()
+  await page.reload()
+  await expect(coinbase).toBeChecked()
+  await principal.check()
+  await expect(page.getByRole('radio', { name: 'MetaMask' })).toBeChecked()
 })
