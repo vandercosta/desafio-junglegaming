@@ -1,5 +1,11 @@
 export const catalogFiltersHash = 'filtros'
 
+export const catalogViews = {
+  all: 'Todos os NFTs',
+  new: 'Novos lançamentos',
+  trending: 'Em alta',
+} as const
+
 export const catalogOptions = {
   collection: {
     'arte-digital': 'Arte digital',
@@ -18,6 +24,7 @@ export const catalogOptions = {
 } as const
 
 export type CatalogSearch = {
+  view?: keyof typeof catalogViews
   q?: string
   collection?: keyof typeof catalogOptions.collection
   network?: keyof typeof catalogOptions.network
@@ -52,6 +59,7 @@ export function parseCatalogSearch(
       : raw.page
 
   return {
+    view: readOption(raw.view, catalogViews),
     q: typeof raw.q === 'string' ? raw.q.trim() || undefined : undefined,
     collection: readOption(raw.collection, catalogOptions.collection),
     network: readOption(raw.network, catalogOptions.network),

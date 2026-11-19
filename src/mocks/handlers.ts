@@ -13,6 +13,7 @@ import { profileHandlers } from './profile-handlers'
 import { walletHandlers } from './wallet-handlers'
 import { checkoutHandlers } from './checkout-handlers'
 import { realtimeHandlers } from './realtime-handlers'
+import { catalogViewIds } from './fixtures/nfts'
 
 const PAGE_SIZE = 3
 
@@ -32,6 +33,10 @@ export const handlers = [
     const params = new URL(request.url).searchParams
     const search = parseCatalogSearch(Object.fromEntries(params))
     const query = search.q?.toLowerCase()
+    const viewIds =
+      search.view && search.view !== 'all'
+        ? catalogViewIds[search.view]
+        : undefined
     const min = search.minEth === undefined ? undefined : toWei(search.minEth)
     const max = search.maxEth === undefined ? undefined : toWei(search.maxEth)
 
@@ -42,6 +47,7 @@ export const handlers = [
             const price = toWei(nft.priceEth)
 
             return (
+              (!viewIds || viewIds.includes(nft.id)) &&
               (!query ||
                 nft.name.toLowerCase().includes(query) ||
                 nft.id.includes(query)) &&

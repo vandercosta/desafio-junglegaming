@@ -1,5 +1,10 @@
 import type { NftEdition, NftSummary } from '@/features/catalog/catalog-api'
 
+export const catalogViewIds = {
+  new: ['0118', '0314', '0160'],
+  trending: ['0042', '0552', '0207'],
+}
+
 export const nfts: NftSummary[] = [
   {
     id: '0042',

@@ -33,7 +33,13 @@ export default function CatalogFilters({
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     const fields = new FormData(event.currentTarget)
-    onApply(parseCatalogSearch({ q: search.q, ...Object.fromEntries(fields) }))
+    onApply(
+      parseCatalogSearch({
+        q: search.q,
+        view: search.view,
+        ...Object.fromEntries(fields),
+      }),
+    )
   }
 
   return (
