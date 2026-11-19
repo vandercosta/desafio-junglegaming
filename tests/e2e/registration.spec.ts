@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { accountAvatar } from './account-menu.js'
 
 test('registers a collector and restores the session after reload', async ({
   page,
@@ -42,7 +43,7 @@ test('registers a collector and restores the session after reload', async ({
   )
 
   await page.reload()
-  await expect(page.getByText('luna_demo', { exact: true })).toBeVisible()
+  await expect(accountAvatar(page, 'luna_demo')).toBeVisible()
 })
 
 test('validates password confirmation and shows registration conflicts', async ({

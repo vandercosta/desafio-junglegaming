@@ -8,7 +8,6 @@ import {
   type SessionState,
 } from '@/features/auth/auth-api'
 import { Button } from '@/components/ui/button'
-import AccountNavigation from '@/features/profile/account-navigation'
 import WalletForm from './wallet-form'
 import {
   getWallets,
@@ -26,26 +25,23 @@ export default function WalletsPage() {
   const userId = session.data?.session?.user.id
 
   return (
-    <main className="page-shell grid gap-6 py-6 md:grid-cols-[13rem_minmax(0,1fr)]">
-      <AccountNavigation signedIn={Boolean(userId)} />
-      <section
-        aria-labelledby="wallets-heading"
-        className="grid min-w-0 content-start gap-6"
-      >
-        <h1 id="wallets-heading" className="text-2xl font-semibold">
-          Carteiras
-        </h1>
-        {userId ? (
-          <AccountWallets key={userId} userId={userId} />
-        ) : session.data !== undefined ? (
-          <Button asChild className="w-fit">
-            <Link to="/perfil/carteiras" search={{ auth: 'entrar' }}>
-              Entrar para ver as carteiras
-            </Link>
-          </Button>
-        ) : null}
-      </section>
-    </main>
+    <section
+      aria-labelledby="wallets-heading"
+      className="grid min-w-0 content-start gap-6"
+    >
+      <h1 id="wallets-heading" className="text-2xl font-semibold">
+        Carteiras
+      </h1>
+      {userId ? (
+        <AccountWallets key={userId} userId={userId} />
+      ) : session.data !== undefined ? (
+        <Button asChild className="w-fit">
+          <Link to="/perfil/carteiras" search={{ auth: 'entrar' }}>
+            Entrar para ver as carteiras
+          </Link>
+        </Button>
+      ) : null}
+    </section>
   )
 }
 

@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 import { expect, test, type Page } from '@playwright/test'
+import { accountAvatar } from './account-menu.js'
 
 const demoEmail = 'ana@kurio.example.test'
 const demoPassword = 'Kurio-Ana!2026'
@@ -18,6 +19,9 @@ async function openProfile(page: Page) {
   await page.getByRole('link', { name: 'Entrar para ver o perfil' }).click()
   await expect(await submitLogin(page, demoEmail, demoPassword)).toBeHidden()
   await expect(page).toHaveURL(/\/perfil$/)
+  await expect(
+    page.getByRole('link', { name: 'Dados do perfil' }),
+  ).toHaveAttribute('aria-current', 'page')
 }
 
 test('updates the collector profile and avatar, and restores both after reload', async ({
@@ -36,8 +40,12 @@ test('updates the collector profile and avatar, and restores both after reload',
   )
   await email.fill('ana.colecionadora@kurio.example.test')
 
-  const avatar = page.getByLabel('Alterar avatar')
-  await avatar.setInputFiles({
+  const avatar = page.getByLabel('Selecionar arquivo de avatar')
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Alterar avatar' }).click(),
+  ])
+  await chooser.setFiles({
     name: 'avatar.txt',
     mimeType: 'text/plain',
     buffer: Buffer.from('not an image'),
@@ -55,9 +63,8 @@ test('updates the collector profile and avatar, and restores both after reload',
   await expect(preview).toBeVisible()
   await save.click()
   await expect(page.getByText('Perfil atualizado.')).toBeVisible()
-  await expect(
-    page.getByRole('banner').getByText('Ana Colecionadora'),
-  ).toBeVisible()
+  const headerAvatar = accountAvatar(page, 'Ana Colecionadora').locator('img')
+  await expect(headerAvatar).toHaveAttribute('src', /^data:image\/png;base64,/)
 
   await page.reload()
   await expect(page.getByLabel('Nome de exibição')).toHaveValue(
@@ -66,12 +73,21 @@ test('updates the collector profile and avatar, and restores both after reload',
   await expect(email).toHaveValue('ana.colecionadora@kurio.example.test')
   await expect(page.getByLabel('Nome ENS')).toHaveValue('ana-kurio')
   await expect(preview).toBeVisible()
+  await expect(headerAvatar).toHaveAttribute('src', /^data:image\/png;base64,/)
   await page.getByRole('button', { name: 'Remover avatar' }).click()
   await save.click()
   await expect(page.getByText('Perfil atualizado.')).toBeVisible()
+  await expect(headerAvatar).toHaveAttribute(
+    'src',
+    /avatar\.svg|^data:image\/svg\+xml/,
+  )
   await page.reload()
   await expect(email).toHaveValue('ana.colecionadora@kurio.example.test')
   await expect(preview).toBeHidden()
+  await expect(headerAvatar).toHaveAttribute(
+    'src',
+    /avatar\.svg|^data:image\/svg\+xml/,
+  )
 
   await page.getByRole('button', { name: 'Sair', exact: true }).click()
   await page.getByRole('link', { name: 'Entrar para ver o perfil' }).click()
@@ -102,6 +118,10 @@ test('validates the current password and accepts the new password on the next lo
   const current = page.getByLabel('Senha atual')
   const nextPassword = 'Kurio-Ana!New-2026'
   await current.fill('wrong-password')
+  await page.getByRole('button', { name: 'Mostrar senha atual' }).click()
+  await expect(current).toHaveAttribute('type', 'text')
+  await page.getByRole('button', { name: 'Ocultar senha atual' }).click()
+  await expect(current).toHaveAttribute('type', 'password')
   await page.getByLabel('Nova senha', { exact: true }).fill(nextPassword)
   const confirmation = page.getByLabel('Confirmar nova senha')
   await confirmation.fill('different-password')

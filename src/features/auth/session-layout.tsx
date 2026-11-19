@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Link,
   Outlet,
   useLocation,
   useNavigate,
@@ -24,6 +23,7 @@ import {
   type SessionState,
 } from './auth-api'
 import RegisterForm from './register-form'
+import AccountPopover from './account-popover'
 import AuthField from './auth-field'
 import AuthSocialOptions from './auth-social-options'
 import CatalogMobileControls from '@/features/catalog/catalog-mobile-controls'
@@ -31,6 +31,7 @@ import { cartQueriesKey } from '@/features/cart/cart-api'
 import { getCartScope } from '@/features/cart/cart-session'
 import { favoritesQueriesKey } from '@/features/favorites/favorites-api'
 import { profileQueriesKey } from '@/features/profile/profile-api'
+import AccountNavigation from '@/features/profile/account-navigation'
 import { walletsQueriesKey } from '@/features/wallets/wallets-api'
 import { checkoutQueriesKey } from '@/features/checkout/checkout-api'
 import RealtimeProvider from '@/features/realtime/realtime-provider'
@@ -39,9 +40,12 @@ export default function SessionLayout() {
   const authMode = useLocation({
     select: (location) => location.search.auth,
   })
-  const isHome = useLocation({
-    select: (location) => location.pathname === '/',
+  const pathname = useLocation({
+    select: (location) => location.pathname,
   })
+  const accountPath = pathname.replace(/\/$/, '')
+  const isAccountPage =
+    accountPath === '/perfil' || accountPath === '/perfil/carteiras'
   const router = useRouter()
   const [registeredEmail, setRegisteredEmail] = useState('')
   const [authNotice, setAuthNotice] = useState<{
@@ -217,25 +221,15 @@ export default function SessionLayout() {
       <SiteHeader
         brandRef={brandRef}
         cartScope={cartScope}
-        mobileCatalog={isHome ? <CatalogMobileControls /> : null}
+        mobileCatalog={pathname === '/' ? <CatalogMobileControls /> : null}
         account={
           user ? (
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
-              <p className="max-w-full truncate">{user.displayName}</p>
-              <Link to="/perfil" className="underline">
-                Meu perfil
-              </Link>
-              <Link to="/favoritos" className="underline">
-                Lista de interesse
-              </Link>
-              <Button
-                type="button"
-                disabled={logout.isPending}
-                onClick={() => logout.mutate()}
-              >
-                {logout.isPending ? 'Saindo…' : 'Sair'}
-              </Button>
-            </div>
+            <AccountPopover
+              key={user.id}
+              user={user}
+              signingOut={logout.isPending}
+              onSignOut={() => logout.mutate()}
+            />
           ) : sessionQuery.data !== undefined ? (
             <Dialog.Trigger asChild>
               <Button
@@ -287,7 +281,18 @@ export default function SessionLayout() {
           sessionQuery.data === undefined ? undefined : (user?.id ?? null)
         }
       >
-        <Outlet />
+        {isAccountPage ? (
+          <main className="page-shell grid gap-7 pt-8 pb-12 md:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[310px_minmax(0,1fr)]">
+            <AccountNavigation
+              signedIn={Boolean(user)}
+              signingOut={logout.isPending}
+              onSignOut={() => logout.mutate()}
+            />
+            <Outlet />
+          </main>
+        ) : (
+          <Outlet />
+        )}
       </RealtimeProvider>
 
       <Dialog.Portal>

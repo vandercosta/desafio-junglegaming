@@ -1,4 +1,5 @@
 import { users } from './fixtures/users'
+import type { Session } from '@/features/auth/auth-api'
 
 export const userStorageKey = 'kurio:mock-users:v1'
 
@@ -6,6 +7,20 @@ export type MockUser = (typeof users)[number] & {
   ensName?: string
   walletNickname?: string
   avatarUrl?: string | null
+}
+
+export function toSessionUser({
+  id,
+  displayName,
+  email,
+  avatarUrl,
+}: MockUser): Session['user'] {
+  return {
+    id,
+    displayName,
+    email,
+    avatarUrl: typeof avatarUrl === 'string' ? avatarUrl : null,
+  }
 }
 
 const userFields = [

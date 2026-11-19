@@ -11,6 +11,7 @@ export type Session = {
     id: string
     displayName: string
     email: string
+    avatarUrl?: string | null
   }
   expiresAt: string
 }

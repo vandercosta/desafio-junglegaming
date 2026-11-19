@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
-import { useState, type ChangeEvent, type SubmitEvent } from 'react'
+import { useRef, useState, type ChangeEvent, type SubmitEvent } from 'react'
+import avatarIcon from '@/assets/icons/avatar.svg'
 import { sessionQueryKey, type SessionState } from '@/features/auth/auth-api'
 import { Button } from '@/components/ui/button'
 import {
@@ -51,6 +52,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
   const [draft, setDraft] = useState<ProfileInput>(profile)
   const [readingAvatar, setReadingAvatar] = useState(false)
   const [avatarError, setAvatarError] = useState('')
+  const avatarInput = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
   const queryKey = profileQueryKey(profile.id)
 
@@ -84,6 +86,9 @@ export function ProfileForm({ profile }: { profile: Profile }) {
 
   const errors = fieldErrors<ProfileErrors>(save.error)
   const avatarMessage = avatarError || errors?.avatarUrl
+  const avatarDescription = avatarMessage
+    ? 'avatar-error avatar-formats'
+    : 'avatar-formats'
   const pending = save.isPending || readingAvatar
 
   function updateField<K extends keyof ProfileInput>(
@@ -149,13 +154,14 @@ export function ProfileForm({ profile }: { profile: Profile }) {
         }
       }}
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-x-7 gap-y-6 sm:grid-cols-2 md:gap-y-[30px]">
         {profileFields.map(({ name, label, ...options }) => (
           <ProfileField
             key={name}
             id={`profile-${name}`}
             label={label}
             {...options}
+            collector
             required
             readOnly={pending}
             value={draft[name]}
@@ -164,30 +170,60 @@ export function ProfileForm({ profile }: { profile: Profile }) {
           />
         ))}
 
-        <div className="grid content-start gap-2">
-          <label htmlFor="profile-avatar">Alterar avatar</label>
-          {draft.avatarUrl && (
-            <img
-              src={draft.avatarUrl}
-              alt="Avatar do colecionador"
-              width="64"
-              height="64"
-              className="size-16 rounded-full object-cover"
-            />
-          )}
+        <div className="grid min-w-0 content-start gap-2">
+          <p className="text-[15px]/[18px]">Avatar</p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div className="grid size-[50px] shrink-0 place-items-center overflow-hidden rounded-full border bg-[#2f1d15]">
+              {draft.avatarUrl ? (
+                <img
+                  src={draft.avatarUrl}
+                  alt="Avatar do colecionador"
+                  className="size-full object-cover"
+                />
+              ) : (
+                <img src={avatarIcon} alt="" width={20} height={20} />
+              )}
+            </div>
+            <Button
+              type="button"
+              disabled={pending}
+              aria-label="Alterar avatar"
+              aria-describedby={avatarDescription}
+              onClick={() => avatarInput.current?.click()}
+              className="h-10 min-w-[98px] cursor-pointer rounded-[3px] text-[15px] font-bold"
+            >
+              Alterar
+            </Button>
+            <Button
+              type="button"
+              variant="link"
+              className="h-10 cursor-pointer px-0 text-[15px] font-normal text-foreground"
+              disabled={pending || (!draft.avatarUrl && !avatarMessage)}
+              aria-label={avatarMessage ? undefined : 'Remover avatar'}
+              onClick={() => {
+                setAvatarError('')
+                updateField('avatarUrl', avatarMessage ? draft.avatarUrl : null)
+              }}
+            >
+              {avatarMessage ? 'Descartar seleção' : 'Remover'}
+            </Button>
+          </div>
+          <label htmlFor="profile-avatar" className="sr-only">
+            Selecionar arquivo de avatar
+          </label>
           <input
+            ref={avatarInput}
             id="profile-avatar"
             type="file"
+            tabIndex={-1}
             accept={avatarTypes.join(',')}
             disabled={pending}
             onChange={(event) => void selectAvatar(event)}
             aria-invalid={Boolean(avatarMessage)}
-            aria-describedby={
-              avatarMessage ? 'avatar-error avatar-formats' : 'avatar-formats'
-            }
-            className="w-full rounded-md border p-2 text-sm file:mr-2 focus-visible:outline-2 focus-visible:outline-ring"
+            aria-describedby={avatarDescription}
+            className="sr-only"
           />
-          <p id="avatar-formats" className="text-sm text-muted-foreground">
+          <p id="avatar-formats" className="sr-only">
             PNG, JPEG ou WebP de até 512 KiB.
           </p>
           {avatarMessage && (
@@ -199,20 +235,6 @@ export function ProfileForm({ profile }: { profile: Profile }) {
               {avatarMessage}
             </p>
           )}
-          {(draft.avatarUrl || avatarMessage) && (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-fit"
-              disabled={pending}
-              onClick={() => {
-                setAvatarError('')
-                updateField('avatarUrl', avatarMessage ? draft.avatarUrl : null)
-              }}
-            >
-              {avatarMessage ? 'Descartar seleção' : 'Remover avatar'}
-            </Button>
-          )}
         </div>
       </div>
       {save.isSuccess && <p role="status">Perfil atualizado.</p>}
@@ -222,7 +244,7 @@ export function ProfileForm({ profile }: { profile: Profile }) {
       <Button
         type="submit"
         disabled={pending || Boolean(avatarError)}
-        className="w-fit"
+        className="h-10 w-fit min-w-[131px] cursor-pointer rounded-[3px] text-[15px] font-bold"
       >
         {save.isPending ? 'Salvando…' : 'Salvar perfil'}
       </Button>
@@ -275,19 +297,20 @@ export function PasswordForm({ userId }: { userId: string }) {
 
   return (
     <form
-      className="grid max-w-md gap-4"
+      className="grid gap-6 sm:w-[calc((100%-1.75rem)/2)]"
       onSubmit={(event) => void submit(event)}
       onChange={() => {
         setConfirmationError('')
         if (change.isError || change.isSuccess) change.reset()
       }}
     >
-      <h2 className="text-lg font-semibold">Alterar senha</h2>
+      <h2 className="text-[16px]/5 font-medium">Alterar senha</h2>
       <ProfileField
         id="current-password"
         name="currentPassword"
         label="Senha atual"
         type="password"
+        collector
         autoComplete="current-password"
         required
         readOnly={change.isPending}
@@ -298,6 +321,7 @@ export function PasswordForm({ userId }: { userId: string }) {
         name="newPassword"
         label="Nova senha"
         type="password"
+        collector
         autoComplete="new-password"
         required
         readOnly={change.isPending}
@@ -308,6 +332,7 @@ export function PasswordForm({ userId }: { userId: string }) {
         name="confirmation"
         label="Confirmar nova senha"
         type="password"
+        collector
         autoComplete="new-password"
         required
         readOnly={change.isPending}
@@ -317,8 +342,13 @@ export function PasswordForm({ userId }: { userId: string }) {
       {change.isError && !errors && (
         <p role="alert">Não foi possível alterar a senha. Tente novamente.</p>
       )}
-      <Button type="submit" disabled={change.isPending} className="w-fit">
-        {change.isPending ? 'Alterando…' : 'Salvar nova senha'}
+      <Button
+        type="submit"
+        disabled={change.isPending}
+        aria-label={change.isPending ? undefined : 'Salvar nova senha'}
+        className="mt-2 h-10 w-fit min-w-[131px] cursor-pointer rounded-[3px] text-[15px] font-bold"
+      >
+        {change.isPending ? 'Alterando…' : 'Salvar'}
       </Button>
     </form>
   )

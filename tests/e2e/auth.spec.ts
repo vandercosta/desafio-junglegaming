@@ -1,4 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
+import {
+  accountAvatar,
+  openAccountMenu,
+  signOutFromHeader,
+} from './account-menu.js'
 
 async function signIn(page: Page, email: string, password: string) {
   await page.getByRole('button', { name: 'Entrar', exact: true }).click()
@@ -16,12 +21,22 @@ test('restores the session after reload and allows switching accounts', async ({
 }) => {
   await page.goto('/')
   await signIn(page, 'ana@kurio.example.test', 'Kurio-Ana!2026')
-  await expect(page.getByText('Ana Demo', { exact: true })).toBeVisible()
+  await expect(accountAvatar(page, 'Ana Demo')).toBeVisible()
 
   await page.reload()
-  await expect(page.getByText('Ana Demo', { exact: true })).toBeVisible()
+  await expect(accountAvatar(page, 'Ana Demo')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  const trigger = accountAvatar(page, 'Ana Demo')
+  await expect(trigger.locator('img')).toHaveAttribute(
+    'src',
+    /avatar\.svg|^data:image\/svg\+xml/,
+  )
+  const menu = await openAccountMenu(page)
+  await expect(menu.getByText('Ana Demo', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+  await expect(trigger).toBeFocused()
+  await signOutFromHeader(page)
   await expect(
     page.getByRole('button', { name: 'Entrar', exact: true }),
   ).toBeVisible()
@@ -32,7 +47,7 @@ test('restores the session after reload and allows switching accounts', async ({
   ).toBeVisible()
 
   await signIn(page, 'bruno@kurio.example.test', 'Kurio-Bruno!2026')
-  await expect(page.getByText('Bruno Demo', { exact: true })).toBeVisible()
+  await expect(accountAvatar(page, 'Bruno Demo')).toBeVisible()
 })
 
 test('rejects invalid credentials and preserves the current NFT URL after sign-in', async ({
@@ -76,7 +91,7 @@ test('asks the user to sign in again after the mock session expires', async ({
   await page.goto('/')
 
   await signIn(page, 'ana@kurio.example.test', 'Kurio-Ana!2026')
-  await expect(page.getByText('Ana Demo', { exact: true })).toBeVisible()
+  await expect(accountAvatar(page, 'Ana Demo')).toBeVisible()
 
   await page.clock.setFixedTime(new Date('2026-01-01T12:31:00Z'))
   await page.reload()

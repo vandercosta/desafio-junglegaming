@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { openAccountMenu, signOutFromHeader } from './account-menu.js'
 
 const favoriteName = 'Favoritar Emerald Ape #042'
 
@@ -36,11 +37,14 @@ test('preserves the current NFT at login and keeps favorites isolated by account
   await page.reload()
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
 
+  const account = await openAccountMenu(page)
+  await account.getByRole('link', { name: 'Meu perfil' }).click()
+  await expect(account).toBeHidden()
   await page.getByRole('link', { name: 'Lista de interesse' }).click()
   const item = page.getByRole('link', { name: 'Emerald Ape #042' })
   await expect(item).toBeVisible()
 
-  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  await signOutFromHeader(page)
   const enter = page.getByRole('link', { name: 'Entrar para ver favoritos' })
   await expect(enter).toBeVisible()
   await expect(item).toBeHidden()
@@ -48,7 +52,7 @@ test('preserves the current NFT at login and keeps favorites isolated by account
   await signIn(page, 'bruno@kurio.example.test', 'Kurio-Bruno!2026')
   await expect(page.getByText('Você ainda não tem favoritos.')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  await signOutFromHeader(page)
   await enter.click()
   await signIn(page, 'ana@kurio.example.test', 'Kurio-Ana!2026')
   await expect(item).toBeVisible()

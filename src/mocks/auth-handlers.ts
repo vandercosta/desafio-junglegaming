@@ -10,6 +10,7 @@ import {
   derivePasswordVerifier,
   listUsers,
   saveUser,
+  toSessionUser,
   userStorageKey,
   type MockUser,
 } from './user-store'
@@ -55,12 +56,9 @@ export function getMockCartScope() {
   return cartScopeForUser(getMockUserId())
 }
 
-function toSession(
-  { id, displayName, email }: MockUser,
-  expiresAt: number,
-): Session {
+function toSession(user: MockUser, expiresAt: number): Session {
   return {
-    user: { id, displayName, email },
+    user: toSessionUser(user),
     expiresAt: new Date(expiresAt).toISOString(),
   }
 }

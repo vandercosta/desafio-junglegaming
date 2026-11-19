@@ -15,6 +15,7 @@ import {
   derivePasswordVerifier,
   listUsers,
   saveUser,
+  toSessionUser,
   userStorageKey,
   type MockUser,
 } from './user-store'
@@ -173,7 +174,7 @@ export const profileHandlers = [
 
       return HttpResponse.json({
         profile: toProfile(next),
-        user: { id: user.id, displayName, email },
+        user: toSessionUser(next),
       })
     })
   }),

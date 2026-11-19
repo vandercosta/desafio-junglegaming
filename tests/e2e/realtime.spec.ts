@@ -1,4 +1,5 @@
 import { errors, expect, test, type Page } from '@playwright/test'
+import { signOutFromHeader } from './account-menu.js'
 
 type DemoAction =
   | {
@@ -374,7 +375,7 @@ test('keeps a terminal order event private after switching accounts', async ({
   await expect(
     page.getByRole('heading', { name: 'Pedido pendente' }),
   ).toBeVisible()
-  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  await signOutFromHeader(page)
   await signInFromCheckout(page, {
     email: 'bruno@kurio.example.test',
     password: 'Kurio-Bruno!2026',
@@ -397,7 +398,7 @@ test('keeps a terminal order event private after switching accounts', async ({
     page.getByRole('heading', { name: 'Pedido confirmado' }),
   ).toBeHidden()
 
-  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  await signOutFromHeader(page)
   await signInFromCheckout(page)
   await expect(
     page.getByRole('heading', { name: 'Pedido confirmado' }),

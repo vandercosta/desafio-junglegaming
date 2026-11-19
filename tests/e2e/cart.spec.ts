@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { accountAvatar, signOutFromHeader } from './account-menu.js'
 
 test('adds an NFT edition to the guest cart and keeps it after reload', async ({
   page,
@@ -151,7 +152,6 @@ test('merges the guest cart once and keeps each account cart isolated', async ({
   })
   const nft = page.getByRole('heading', { name: 'Emerald Ape #042' })
   const emptyCart = page.getByText('Seu carrinho está vazio.')
-  const signOut = page.getByRole('button', { name: 'Sair', exact: true })
 
   async function buyEdition() {
     await page.goto('/nfts/0042')
@@ -165,7 +165,7 @@ test('merges the guest cart once and keeps each account cart isolated', async ({
     await dialog.getByLabel('E-mail').fill(email)
     await dialog.getByLabel('Senha').fill(password)
     await dialog.getByRole('button', { name: 'Entrar', exact: true }).click()
-    await expect(page.getByText(displayName, { exact: true })).toBeVisible()
+    await expect(accountAvatar(page, displayName)).toBeVisible()
   }
 
   await buyEdition()
@@ -175,7 +175,7 @@ test('merges the guest cart once and keeps each account cart isolated', async ({
 
   await signIn('ana@kurio.example.test', 'Kurio-Ana!2026', 'Ana Demo')
   await expect(summary.getByText('1,087 ETH', { exact: true })).toBeVisible()
-  await signOut.click()
+  await signOutFromHeader(page)
   await expect(emptyCart).toBeVisible()
 
   await signIn('bruno@kurio.example.test', 'Kurio-Bruno!2026', 'Bruno Demo')
@@ -183,7 +183,7 @@ test('merges the guest cart once and keeps each account cart isolated', async ({
   await expect(nft).toBeHidden()
   await buyEdition()
   await expect(summary.getByText('1,206 ETH', { exact: true })).toBeVisible()
-  await signOut.click()
+  await signOutFromHeader(page)
   await expect(
     page.getByRole('button', { name: 'Entrar', exact: true }),
   ).toBeVisible()
@@ -194,12 +194,12 @@ test('merges the guest cart once and keeps each account cart isolated', async ({
 
   await page.reload()
   await expect(summary.getByText('2,158 ETH', { exact: true })).toBeVisible()
-  await signOut.click()
+  await signOutFromHeader(page)
   await expect(emptyCart).toBeVisible()
 
   await signIn('ana@kurio.example.test', 'Kurio-Ana!2026', 'Ana Demo')
   await expect(summary.getByText('2,158 ETH', { exact: true })).toBeVisible()
-  await signOut.click()
+  await signOutFromHeader(page)
   await expect(emptyCart).toBeVisible()
   await signIn('bruno@kurio.example.test', 'Kurio-Bruno!2026', 'Bruno Demo')
   await expect(summary.getByText('1,206 ETH', { exact: true })).toBeVisible()
@@ -232,12 +232,12 @@ test('keeps quantities visible when merging exceeds the available stock', async 
     await dialog.getByLabel('E-mail').fill('ana@kurio.example.test')
     await dialog.getByLabel('Senha').fill('Kurio-Ana!2026')
     await dialog.getByRole('button', { name: 'Entrar', exact: true }).click()
-    await expect(page.getByText('Ana Demo', { exact: true })).toBeVisible()
+    await expect(accountAvatar(page, 'Ana Demo')).toBeVisible()
   }
 
   await signInAsAna()
   await expect(summary.getByText('2,38 ETH', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  await signOutFromHeader(page)
   await expect(page.getByText('Seu carrinho está vazio.')).toBeVisible()
 
   await page.goto('/nfts/0042')
