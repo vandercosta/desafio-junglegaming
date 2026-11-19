@@ -50,7 +50,13 @@ test('rejects invalid credentials and preserves the current NFT URL after sign-i
     'E-mail ou senha incorretos.',
   )
 
-  await dialog.getByLabel('Senha').fill('Kurio-Ana!2026')
+  const passwordInput = dialog.getByLabel('Senha', { exact: true })
+  await dialog.getByRole('button', { name: 'Mostrar senha' }).click()
+  await expect(passwordInput).toHaveAttribute('type', 'text')
+  await dialog.getByRole('button', { name: 'Ocultar senha' }).click()
+  await expect(passwordInput).toHaveAttribute('type', 'password')
+
+  await passwordInput.fill('Kurio-Ana!2026')
   await dialog.getByRole('button', { name: 'Entrar', exact: true }).click()
 
   await expect(dialog).toBeHidden()

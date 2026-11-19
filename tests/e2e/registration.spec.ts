@@ -5,7 +5,10 @@ test('registers a collector and restores the session after reload', async ({
 }) => {
   await page.goto('/nfts/0042?q=Golden&page=2')
   await page.getByRole('button', { name: 'Entrar', exact: true }).click()
-  await page.getByRole('tab', { name: 'Criar conta' }).click()
+  await page
+    .getByRole('tab', { name: 'Criar conta', exact: true })
+    .or(page.getByRole('button', { name: 'Crie uma conta', exact: true }))
+    .click()
 
   const registerDialog = page.getByRole('dialog', { name: 'Criar conta' })
   await registerDialog.getByLabel('Nome de usuário').fill('luna_demo')
@@ -14,7 +17,9 @@ test('registers a collector and restores the session after reload', async ({
     .getByLabel('Senha', { exact: true })
     .fill('Kurio-Luna!2026')
   await registerDialog.getByLabel('Confirmar senha').fill('Kurio-Luna!2026')
-  await registerDialog.getByRole('button', { name: 'Criar conta' }).click()
+  await registerDialog
+    .getByRole('button', { name: /^Criar (conta|perfil)$/ })
+    .click()
 
   const loginDialog = page.getByRole('dialog', { name: 'Entrar' })
   await expect(loginDialog.getByRole('status')).toHaveText(
@@ -50,14 +55,15 @@ test('validates password confirmation and shows registration conflicts', async (
   await dialog.getByLabel('E-mail').fill('ANA@KURIO.EXAMPLE.TEST')
   await dialog.getByLabel('Senha', { exact: true }).fill('OutraSenha!2026')
   await dialog.getByLabel('Confirmar senha').fill('SenhaDiferente!2026')
-  await dialog.getByRole('button', { name: 'Criar conta' }).click()
+  const submit = dialog.getByRole('button', { name: /^Criar (conta|perfil)$/ })
+  await submit.click()
 
   await expect(
     dialog.getByLabel('Confirmar senha'),
   ).toHaveAccessibleDescription('As senhas precisam ser iguais.')
 
   await dialog.getByLabel('Confirmar senha').fill('OutraSenha!2026')
-  await dialog.getByRole('button', { name: 'Criar conta' }).click()
+  await submit.click()
 
   await expect(dialog.getByLabel('E-mail')).toHaveAccessibleDescription(
     'Este e-mail já está cadastrado.',

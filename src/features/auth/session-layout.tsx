@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-router'
 import axios from 'axios'
 import loginIcon from '@/assets/icons/login.svg'
+import { X } from 'lucide-react'
 import { Dialog, Tabs } from 'radix-ui'
 import { useEffect, useRef, type SubmitEvent, useState } from 'react'
 import SiteHeader from '@/components/site-header'
@@ -23,6 +24,8 @@ import {
   type SessionState,
 } from './auth-api'
 import RegisterForm from './register-form'
+import AuthField from './auth-field'
+import AuthSocialOptions from './auth-social-options'
 import CatalogMobileControls from '@/features/catalog/catalog-mobile-controls'
 import { cartQueriesKey } from '@/features/cart/cart-api'
 import { getCartScope } from '@/features/cart/cart-session'
@@ -41,11 +44,23 @@ export default function SessionLayout() {
   })
   const router = useRouter()
   const [registeredEmail, setRegisteredEmail] = useState('')
+  const [authNotice, setAuthNotice] = useState<{
+    kind: 'recovery' | 'social'
+    message: string
+  }>()
 
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const brandRef = useRef<HTMLAnchorElement>(null)
   const entryRef = useRef<HTMLButtonElement>(null)
+  const authContentRef = useRef<HTMLDivElement>(null)
+  const mobileTitleRef = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    if (authContentRef.current) authContentRef.current.scrollTop = 0
+    const title = mobileTitleRef.current
+    if (title?.getClientRects().length) title.focus({ preventScroll: true })
+  }, [authMode])
 
   const sessionQuery = useQuery(sessionQueryOptions)
   const session = sessionQuery.data?.session
@@ -141,6 +156,7 @@ export default function SessionLayout() {
       if (router.state.location.search.auth !== 'cadastrar') return
 
       setRegisteredEmail(email)
+      setAuthNotice(undefined)
       setAuthMode('entrar')
     },
   })
@@ -173,6 +189,18 @@ export default function SessionLayout() {
     axios.isAxiosError<{ code?: string }>(login.error) &&
     login.error.response?.data?.code === 'INVALID_CREDENTIALS'
 
+  const creatingAccount = authMode === 'cadastrar'
+
+  function changeAuthMode(value: string) {
+    if (authPending || (value !== 'entrar' && value !== 'cadastrar')) return
+
+    login.reset()
+    registration.reset()
+    setRegisteredEmail('')
+    setAuthNotice(undefined)
+    setAuthMode(value)
+  }
+
   return (
     <Dialog.Root
       open={authMode !== undefined && !user && sessionQuery.data !== undefined}
@@ -182,6 +210,7 @@ export default function SessionLayout() {
         login.reset()
         registration.reset()
         setRegisteredEmail('')
+        setAuthNotice(undefined)
         setAuthMode(open ? 'entrar' : undefined, !open)
       }}
     >
@@ -262,10 +291,11 @@ export default function SessionLayout() {
       </RealtimeProvider>
 
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/70" />
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/20" />
 
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh_-_2rem)] w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border bg-card p-6 text-card-foreground"
+          ref={authContentRef}
+          className="fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-background px-7 pt-[max(2.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] font-mono text-foreground lg:inset-auto lg:top-1/2 lg:left-1/2 lg:max-h-[calc(100dvh-2rem)] lg:w-[500px] lg:-translate-1/2 lg:rounded-lg lg:border-b-[10px] lg:border-primary lg:bg-surface-card lg:px-0 lg:pt-12 lg:pb-[65px]"
           onEscapeKeyDown={preventDismissWhilePending}
           onInteractOutside={preventDismissWhilePending}
           onCloseAutoFocus={(event) => {
@@ -275,102 +305,143 @@ export default function SessionLayout() {
             }
           }}
         >
+          <Dialog.Close asChild>
+            <button
+              type="button"
+              aria-label="Fechar"
+              disabled={authPending}
+              className="absolute top-[max(0.5rem,env(safe-area-inset-top))] right-2 grid size-10 cursor-pointer place-items-center rounded-md text-text-accent focus-visible:outline-2 focus-visible:outline-primary disabled:opacity-50 lg:top-1 lg:right-1"
+            >
+              <X aria-hidden="true" className="size-5" strokeWidth={1.5} />
+            </button>
+          </Dialog.Close>
           <Dialog.Title className="sr-only">
-            {authMode === 'cadastrar' ? 'Criar conta' : 'Entrar'}
+            {creatingAccount ? 'Criar conta' : 'Entrar'}
           </Dialog.Title>
-          <Dialog.Description>
-            {authMode === 'cadastrar'
-              ? 'Crie seu perfil de colecionador.'
-              : 'Entre na sua conta de colecionador.'}
-          </Dialog.Description>
+          <div className="mx-auto max-w-[358px] pt-[clamp(1rem,calc(15dvh-2.5rem),6rem)] text-center lg:hidden">
+            <p className="text-[32px]/none font-bold tracking-[0.12em]">
+              KURIO
+            </p>
+            <h2
+              ref={mobileTitleRef}
+              tabIndex={-1}
+              className="mt-[clamp(2rem,10dvh,5.5rem)] text-lg/5 font-bold outline-none"
+            >
+              {creatingAccount ? 'Criar perfil de colecionador' : 'Entrar'}
+            </h2>
+          </div>
 
           <Tabs.Root
             value={authMode ?? 'entrar'}
             activationMode="manual"
-            onValueChange={(value) => {
-              if (authPending || (value !== 'entrar' && value !== 'cadastrar'))
-                return
-
-              login.reset()
-              registration.reset()
-              setRegisteredEmail('')
-              setAuthMode(value)
-            }}
+            onValueChange={changeAuthMode}
           >
-            <Tabs.List aria-label="Acesso à conta" className="mb-4 flex gap-2">
-              <Tabs.Trigger value="entrar" disabled={authPending} asChild>
-                <Button variant={authMode === 'entrar' ? 'default' : 'ghost'}>
-                  Entrar
-                </Button>
+            <Tabs.List
+              aria-label="Acesso à conta"
+              className="hidden items-center justify-center gap-2 text-xl/5 font-medium lg:flex"
+            >
+              <Tabs.Trigger
+                value="entrar"
+                disabled={authPending}
+                className="cursor-pointer focus-visible:outline-2 focus-visible:outline-primary data-[state=active]:text-text-accent"
+              >
+                Entrar
               </Tabs.Trigger>
-              <Tabs.Trigger value="cadastrar" disabled={authPending} asChild>
-                <Button
-                  variant={authMode === 'cadastrar' ? 'default' : 'ghost'}
-                >
-                  Criar conta
-                </Button>
+              <span aria-hidden="true" className="h-5 w-px bg-primary" />
+              <Tabs.Trigger
+                value="cadastrar"
+                disabled={authPending}
+                className="cursor-pointer focus-visible:outline-2 focus-visible:outline-primary data-[state=active]:text-text-accent"
+              >
+                Criar conta
               </Tabs.Trigger>
             </Tabs.List>
 
-            <Tabs.Content value="entrar">
+            <Dialog.Description className="sr-only lg:not-sr-only lg:mx-auto lg:mt-10 lg:mb-6 lg:max-w-[420px] lg:px-2 lg:text-center lg:text-[13px]/4">
+              {creatingAccount
+                ? 'Crie seu perfil de colecionador e conecte uma carteira quando quiser.'
+                : 'Entre para gerenciar sua carteira, coleção e perfil de criador.'}
+            </Dialog.Description>
+
+            <Tabs.Content
+              value="entrar"
+              className="mx-auto mt-9 max-w-[358px] lg:mt-0 lg:max-w-[340px]"
+            >
               {registeredEmail && (
                 <p role="status" className="mb-3">
                   Conta criada. Entre com a sua senha.
                 </p>
               )}
-              {
-                <form onSubmit={handleSubmit} className="grid gap-3">
-                  <label htmlFor="login-email">E-mail</label>
-                  <input
-                    id="login-email"
-                    name="email"
-                    type="email"
-                    autoComplete="username"
-                    defaultValue={registeredEmail}
-                    required
-                    readOnly={login.isPending}
-                    className="rounded-md border p-2"
-                  />
+              <form onSubmit={handleSubmit} className="grid gap-3">
+                <AuthField
+                  id="login-email"
+                  name="email"
+                  label="E-mail"
+                  placeholder="contato@email.com"
+                  type="email"
+                  autoComplete="username"
+                  defaultValue={registeredEmail}
+                  required
+                  readOnly={login.isPending}
+                />
 
-                  <label htmlFor="login-password">Senha</label>
-                  <input
-                    id="login-password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    readOnly={login.isPending}
-                    className="rounded-md border p-2"
-                  />
+                <AuthField
+                  id="login-password"
+                  name="password"
+                  label="Senha"
+                  placeholder="Senha"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  readOnly={login.isPending}
+                />
 
-                  {login.isError && (
-                    <p role="alert">
-                      {invalidCredentials
-                        ? 'E-mail ou senha incorretos.'
-                        : 'Não foi possível entrar. Tente novamente.'}
-                    </p>
-                  )}
+                <button
+                  type="button"
+                  disabled={authPending}
+                  onClick={() =>
+                    setAuthNotice({
+                      kind: 'recovery',
+                      message:
+                        'A recuperação de senha está indisponível nesta demonstração.',
+                    })
+                  }
+                  className="cursor-pointer justify-self-end text-right text-sm text-text-accent hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  Esqueceu a senha?
+                </button>
 
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Dialog.Close asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={login.isPending}
-                      >
-                        Cancelar
-                      </Button>
-                    </Dialog.Close>
+                {authNotice?.kind === 'recovery' && (
+                  <p
+                    role="status"
+                    className="text-right text-[13px] text-muted-foreground"
+                  >
+                    {authNotice.message}
+                  </p>
+                )}
 
-                    <Button type="submit" disabled={login.isPending}>
-                      {login.isPending ? 'Entrando…' : 'Entrar'}
-                    </Button>
-                  </div>
-                </form>
-              }
+                {login.isError && (
+                  <p role="alert" className="text-sm text-destructive">
+                    {invalidCredentials
+                      ? 'E-mail ou senha incorretos.'
+                      : 'Não foi possível entrar. Tente novamente.'}
+                  </p>
+                )}
+
+                <Button
+                  type="submit"
+                  disabled={login.isPending}
+                  className="mt-7 h-[60px] w-full cursor-pointer rounded-[10px] text-base font-bold lg:mt-3 lg:h-[45px] lg:rounded-[5px]"
+                >
+                  {login.isPending ? 'Entrando…' : 'Entrar'}
+                </Button>
+              </form>
             </Tabs.Content>
 
-            <Tabs.Content value="cadastrar">
+            <Tabs.Content
+              value="cadastrar"
+              className="mx-auto mt-9 max-w-[358px] lg:mt-0 lg:max-w-[340px]"
+            >
               <RegisterForm
                 pending={registration.isPending}
                 errors={registrationErrors}
@@ -379,6 +450,35 @@ export default function SessionLayout() {
               />
             </Tabs.Content>
           </Tabs.Root>
+          <AuthSocialOptions
+            onSelect={(provider) =>
+              setAuthNotice({
+                kind: 'social',
+                message: `O acesso com ${provider} está indisponível nesta demonstração.`,
+              })
+            }
+          />
+          {authNotice?.kind === 'social' && (
+            <p
+              role="status"
+              className="mx-auto mt-4 max-w-[340px] text-center text-[13px] text-muted-foreground"
+            >
+              {authNotice.message}
+            </p>
+          )}
+          <p className="mt-[clamp(1.5rem,calc(24dvh-11rem),2.5rem)] text-center text-sm text-muted-foreground lg:hidden">
+            {creatingAccount ? 'Já tem uma conta? ' : 'Novo na Kurio? '}
+            <button
+              type="button"
+              disabled={authPending}
+              onClick={() =>
+                changeAuthMode(creatingAccount ? 'entrar' : 'cadastrar')
+              }
+              className="cursor-pointer hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              {creatingAccount ? 'Entre' : 'Crie uma conta'}
+            </button>
+          </p>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
