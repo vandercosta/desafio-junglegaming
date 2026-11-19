@@ -8,6 +8,7 @@ export const catalogViewIds = {
 export const nfts: NftSummary[] = [
   {
     id: '0042',
+    imageUrl: '/images/nfts/emerald-ape.png',
     name: 'Emerald Ape #042',
     priceEth: '1.19',
     collection: 'arte-digital',
@@ -15,6 +16,7 @@ export const nfts: NftSummary[] = [
   },
   {
     id: '0009',
+    imageUrl: '/images/nfts/sage-nomad.png',
     name: 'Sage Nomad #009',
     priceEth: '1.69',
     collection: 'arte-digital',
@@ -22,6 +24,7 @@ export const nfts: NftSummary[] = [
   },
   {
     id: '0552',
+    imageUrl: '/images/nfts/neon-vessel.png',
     name: 'Neon Vessel #552',
     priceEth: '1.99',
     collection: 'arte-3d',
@@ -29,6 +32,7 @@ export const nfts: NftSummary[] = [
   },
   {
     id: '0118',
+    imageUrl: '/images/nfts/sage-nomad.png',
     name: 'Cosmic Bloom #118',
     priceEth: '1.29',
     collection: 'arte-digital',
@@ -36,6 +40,7 @@ export const nfts: NftSummary[] = [
   },
   {
     id: '0314',
+    imageUrl: '/images/nfts/sage-nomad.png',
     name: 'Violet Nomad #314',
     priceEth: '1.39',
     collection: 'arte-digital',
@@ -43,6 +48,7 @@ export const nfts: NftSummary[] = [
   },
   {
     id: '0088',
+    imageUrl: '/images/nfts/neon-vessel.png',
     name: 'Ivory Baron #088',
     priceEth: '1.79',
     collection: 'arte-3d',
@@ -50,6 +56,7 @@ export const nfts: NftSummary[] = [
   },
   {
     id: '0207',
+    imageUrl: '/images/nfts/golden-beat.png',
     name: 'Golden Beat #207',
     priceEth: '0.99',
     collection: 'musica',
@@ -57,6 +64,7 @@ export const nfts: NftSummary[] = [
   },
   {
     id: '0071',
+    imageUrl: '/images/nfts/golden-beat.png',
     name: 'Golden Frequency #071',
     priceEth: '0.59',
     collection: 'musica',
@@ -64,6 +72,7 @@ export const nfts: NftSummary[] = [
   },
   {
     id: '0160',
+    imageUrl: '/images/nfts/golden-beat.png',
     name: 'Golden Signal #160',
     priceEth: '0.39',
     collection: 'musica',

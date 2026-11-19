@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 export type NftSummary = {
   id: string
   name: string
+  imageUrl: string
   priceEth: string
   collection: NonNullable<CatalogSearch['collection']>
   network: NonNullable<CatalogSearch['network']>

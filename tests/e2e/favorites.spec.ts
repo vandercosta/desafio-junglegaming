@@ -59,10 +59,14 @@ test('preserves the current NFT at login and keeps favorites isolated by account
   await expect(page.getByText('Você ainda não tem favoritos.')).toBeVisible()
 })
 
-test('rolls back a failed favorite and allows a retry from the catalog', async ({
+test('opens a catalog card and rolls back a failed favorite in its detail', async ({
   page,
 }) => {
   await page.goto('/')
+  const card = page.getByRole('link', { name: 'Emerald Ape #042', exact: true })
+  await card.scrollIntoViewIfNeeded()
+  await expect(card.locator('img')).toHaveJSProperty('naturalWidth', 250)
+  await card.click()
   await page
     .getByRole('link', { name: 'Entrar para favoritar Emerald Ape #042' })
     .click()

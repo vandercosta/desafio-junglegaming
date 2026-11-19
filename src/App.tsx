@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query'
-import FavoriteButton from '@/features/favorites/favorite-button'
 import HomeCarousel from '@/components/home-carousel'
 import { Button } from '@/components/ui/button'
 import { listNfts } from '@/features/catalog/catalog-api'
@@ -152,23 +151,32 @@ export default function App() {
         {items?.length === 0 && <p>Nenhum NFT encontrado.</p>}
 
         {items && items.length > 0 && (
-          <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-8 lg:grid-cols-[repeat(3,minmax(0,258px))] lg:gap-x-[34px] lg:gap-y-16">
             {items.map((nft) => (
-              <li key={nft.id} className="rounded-md border p-4">
-                <h3>
-                  <Link
-                    to="/nfts/$nftId"
-                    params={{ nftId: nft.id }}
-                    search={search}
-                    className="underline"
-                  >
+              <li key={nft.id} className="min-w-0">
+                <Link
+                  to="/nfts/$nftId"
+                  params={{ nftId: nft.id }}
+                  search={search}
+                  className="group block focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                >
+                  <div className="grid aspect-[258/300] items-center bg-surface-card px-1">
+                    <img
+                      src={nft.imageUrl}
+                      alt=""
+                      width={250}
+                      height={250}
+                      loading="lazy"
+                      className="aspect-square w-full rounded-[15px] object-cover"
+                    />
+                  </div>
+                  <h3 className="mt-3 text-base/none font-normal text-foreground group-hover:underline">
                     {nft.name}
-                  </Link>
-                </h3>
-                <p>{nft.priceEth.replace('.', ',')} ETH</p>
-                <div className="mt-3">
-                  <FavoriteButton nft={nft} />
-                </div>
+                  </h3>
+                </Link>
+                <p className="mt-2 text-lg/4 font-bold text-text-accent">
+                  {nft.priceEth} ETH
+                </p>
               </li>
             ))}
           </ul>

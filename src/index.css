@@ -25,6 +25,8 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-surface-dark: var(--surface-dark);
+  --color-surface-card: var(--surface-card);
+  --color-text-accent: var(--text-accent);
   --color-metadata-foreground: var(--metadata-foreground);
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
@@ -51,6 +53,8 @@
 }
 
 :root {
+  --surface-card: var(--card);
+  --text-accent: var(--primary);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -88,6 +92,8 @@
 }
 
 .dark {
+  --surface-card: #241612;
+  --text-accent: #e89b55;
   --background: #140d0a;
   --foreground: #f5f1eb;
   --card: oklch(0.205 0 0);
