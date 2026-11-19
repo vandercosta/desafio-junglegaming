@@ -13,7 +13,7 @@ export default defineConfig({
   },
 
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 4175 --strictPort',
+    command: 'npm run dev:mocks -- --host 127.0.0.1 --port 4175 --strictPort',
     url: baseURL,
   },
 
