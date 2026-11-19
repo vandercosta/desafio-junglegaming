@@ -17,21 +17,12 @@ const prices = [
 type Props = {
   search: CatalogSearch
   onApply: (search: CatalogSearch) => void
-  showSearch?: boolean
-  showSort?: boolean
-  searchInputId?: string
 }
 
 const fieldClassName =
   'min-w-0 rounded-md border border-input bg-background p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
 
-export default function CatalogFilters({
-  search,
-  onApply,
-  showSearch = true,
-  showSort = true,
-  searchInputId,
-}: Props) {
+export default function CatalogFilters({ search, onApply }: Props) {
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     const fields = new FormData(event.currentTarget)
@@ -39,7 +30,6 @@ export default function CatalogFilters({
       parseCatalogSearch({
         q: search.q,
         view: search.view,
-        sort: search.sort,
         ...Object.fromEntries(fields),
       }),
     )
@@ -47,40 +37,24 @@ export default function CatalogFilters({
 
   return (
     <form onSubmit={handleSubmit} className="my-4 grid gap-4 sm:grid-cols-2">
-      {showSearch && (
-        <label className="grid gap-1">
-          Buscar NFTs
-          <input
-            key={search.q ?? ''}
-            id={searchInputId}
-            type="search"
-            name="q"
-            defaultValue={search.q}
+      {selects.map(({ name, label, empty }) => (
+        <label key={name} className="grid gap-1">
+          {label}
+          <select
+            key={search[name] ?? ''}
+            name={name}
+            defaultValue={search[name] ?? ''}
             className={fieldClassName}
-          />
+          >
+            <option value="">{empty}</option>
+            {Object.entries(catalogOptions[name]).map(([value, text]) => (
+              <option key={value} value={value}>
+                {text}
+              </option>
+            ))}
+          </select>
         </label>
-      )}
-
-      {selects
-        .filter(({ name }) => showSort || name !== 'sort')
-        .map(({ name, label, empty }) => (
-          <label key={name} className="grid gap-1">
-            {label}
-            <select
-              key={search[name] ?? ''}
-              name={name}
-              defaultValue={search[name] ?? ''}
-              className={fieldClassName}
-            >
-              <option value="">{empty}</option>
-              {Object.entries(catalogOptions[name]).map(([value, text]) => (
-                <option key={value} value={value}>
-                  {text}
-                </option>
-              ))}
-            </select>
-          </label>
-        ))}
+      ))}
 
       {prices.map(({ name, label }) => (
         <label key={name} className="grid gap-1">

@@ -7,6 +7,7 @@ Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Ku
 ## Funcionalidades atuais
 
 - Catálogo com busca por nome ou ID, filtros combináveis por coleção, rede e faixa de preço, ordenação e paginação. A URL guarda os filtros aplicados e a página.
+- No desktop, a lupa abre a busca com atraso de 350 ms após a digitação. A barra lateral aplica coleção e rede ao selecionar e usa dois controles para ajustar a faixa de preço antes de clicar em **Aplicar**.
 - Detalhe com acesso direto por URL, descrição da obra, coleção, atributos, rede, contrato, direitos autorais, seleção de edição e controle de quantidade por estoque.
 - Carrinho de visitante com inclusão, alteração de quantidade, remoção e persistência após atualizar a página.
 - Carrinhos por conta, com transferência dos itens de visitante no login e isolamento ao trocar de usuário.
@@ -282,7 +283,7 @@ O servidor de desenvolvimento e o preview usam portas diferentes. Limpe as chave
 
 | Método   | Endpoint                   | Comportamento                                                                                                                                                                                                                   |
 | -------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/api/nfts`                | Lista NFTs. Aceita `q`, `collection`, `network`, `minEth`, `maxEth`, `sort` e `page`. Retorna `items`, `total` e `pageSize`.                                                                                                    |
+| `GET`    | `/api/nfts`                | Lista NFTs. Aceita `q`, `view`, `collection`, `network`, `minEth`, `maxEth`, `sort` e `page`. Retorna `items`, `total`, `pageSize` e `facets` com contagens por coleção e rede antes dos filtros.                               |
 | `GET`    | `/api/nfts/:nftId`         | Retorna o detalhe e o estoque por edição. Um ID inexistente retorna HTTP `404` com o código `NFT_NOT_FOUND`.                                                                                                                    |
 | `GET`    | `/api/cart`                | Retorna os itens e a cotação do carrinho da sessão atual, com subtotal, desconto, taxa de rede e total.                                                                                                                         |
 | `POST`   | `/api/cart/items`          | Recebe `nftId`, `editionId` e `quantity`. Soma à quantidade quando já existe uma linha para o mesmo NFT e edição.                                                                                                               |

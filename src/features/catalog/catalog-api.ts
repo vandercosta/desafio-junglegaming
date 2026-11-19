@@ -30,10 +30,16 @@ export type NftDetail = NftSummary & {
   editions: NftEdition[]
 }
 
+export type CatalogFacets = {
+  collections: Partial<Record<NftSummary['collection'], number>>
+  networks: Partial<Record<NftSummary['network'], number>>
+}
+
 export type NftListResponse = {
   items: NftSummary[]
   total: number
   pageSize: number
+  facets?: CatalogFacets
 }
 
 export async function listNfts(

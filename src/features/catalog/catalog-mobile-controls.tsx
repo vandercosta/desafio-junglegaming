@@ -96,7 +96,6 @@ export default function CatalogMobileControls() {
 
             <CatalogFilters
               search={search}
-              showSearch={false}
               onApply={(nextSearch) => {
                 setFiltersOpen(false)
                 updateSearch(nextSearch)

@@ -1,5 +1,9 @@
 import { delay, http, HttpResponse } from 'msw'
-import type { NftDetail, NftListResponse } from '@/features/catalog/catalog-api'
+import type {
+  CatalogFacets,
+  NftDetail,
+  NftListResponse,
+} from '@/features/catalog/catalog-api'
 import {
   catalogOptions,
   parseCatalogSearch,
@@ -40,23 +44,27 @@ export const handlers = [
     const min = search.minEth === undefined ? undefined : toWei(search.minEth)
     const max = search.maxEth === undefined ? undefined : toWei(search.maxEth)
 
-    const matches =
-      scenario === 'empty'
-        ? []
-        : readCatalog().nfts.filter((nft) => {
-            const price = toWei(nft.priceEth)
+    const nfts = scenario === 'empty' ? [] : readCatalog().nfts
+    const facets: CatalogFacets = { collections: {}, networks: {} }
+    for (const { collection, network } of nfts) {
+      facets.collections[collection] = (facets.collections[collection] ?? 0) + 1
+      facets.networks[network] = (facets.networks[network] ?? 0) + 1
+    }
 
-            return (
-              (!viewIds || viewIds.includes(nft.id)) &&
-              (!query ||
-                nft.name.toLowerCase().includes(query) ||
-                nft.id.includes(query)) &&
-              (!search.collection || nft.collection === search.collection) &&
-              (!search.network || nft.network === search.network) &&
-              (min === undefined || price >= min) &&
-              (max === undefined || price <= max)
-            )
-          })
+    const matches = nfts.filter((nft) => {
+      const price = toWei(nft.priceEth)
+
+      return (
+        (!viewIds || viewIds.includes(nft.id)) &&
+        (!query ||
+          nft.name.toLowerCase().includes(query) ||
+          nft.id.includes(query)) &&
+        (!search.collection || nft.collection === search.collection) &&
+        (!search.network || nft.network === search.network) &&
+        (min === undefined || price >= min) &&
+        (max === undefined || price <= max)
+      )
+    })
 
     if (search.sort) {
       const direction = search.sort === 'price-asc' ? 1 : -1
@@ -75,6 +83,7 @@ export const handlers = [
       items: matches.slice(start, start + PAGE_SIZE),
       total: matches.length,
       pageSize: PAGE_SIZE,
+      facets,
     })
   }),
   http.get('/api/nfts/:nftId', async ({ params }) => {
