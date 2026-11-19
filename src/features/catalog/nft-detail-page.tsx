@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams, useSearch } from '@tanstack/react-router'
 import { useState } from 'react'
+import FavoriteButton from '@/features/favorites/favorite-button'
 import { Button } from '@/components/ui/button'
 import { getNft } from './catalog-api'
 import type { NftEdition } from './catalog-api'
@@ -177,6 +178,7 @@ export default function NftDetailPage() {
         <>
           <h1 className="text-2xl font-semibold">{nft.name}</h1>
           <p>{nft.priceEth.replace('.', ',')} ETH</p>
+          <FavoriteButton nft={nft} />
           <section aria-labelledby="nft-about">
             <h2 id="nft-about">Sobre este NFT</h2>
             <p>{nft.description}</p>

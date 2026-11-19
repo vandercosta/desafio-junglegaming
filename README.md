@@ -14,9 +14,10 @@ Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Ku
 - Remoção otimista no carrinho. A linha some enquanto a solicitação está pendente e reaparece se a API rejeitar a operação.
 - Login e logout simulados, com recuperação da sessão após atualizar a página e aviso de expiração. O diálogo de login preserva a rota e os filtros atuais.
 - Cadastro de colecionadores com validação por campo, tratamento de conflitos e persistência das contas de demonstração.
+- Favoritos no catálogo e no detalhe, com lista de interesse persistida por conta e retorno ao estado anterior em caso de falha.
 - Estados de carregamento, lista vazia, erro e recurso inexistente.
 
-Favoritos, perfil, carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
+Perfil, carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
 
 ## Tecnologias
 
@@ -101,6 +102,22 @@ Para testar credenciais inválidas, use um dos e-mails da tabela com uma senha d
 
 Para simular expiração manualmente, entre com uma conta, abra o armazenamento local no DevTools e altere `expiresAt` para `0` no valor da chave `kurio:mock-session:v1`. Ao atualizar a página, a interface mostra **Sua sessão expirou. Entre novamente.** O teste automatizado reproduz esse comportamento avançando o relógio do navegador.
 
+## Favoritos
+
+Em qualquer card do catálogo ou no detalhe de um NFT, clique em **Favoritar**. Como visitante, a ação abre **Entrar** e preserva a página. Após o login, clique em **Favoritar** novamente para salvar o NFT. Use **Lista de interesse** no cabeçalho ou abra `/favoritos` para consultar e remover os itens salvos.
+
+Para conferir o isolamento, salve um NFT com Ana, recarregue a página, saia e entre com Bruno. O favorito fica disponível na conta de Ana.
+
+### Simular uma falha ao favoritar
+
+Já autenticado, abra o console do navegador e execute o comando abaixo.
+
+```js
+localStorage.setItem('kurio:mock-favorites-fail-next:v1', 'true')
+```
+
+Clique em **Favoritar**. O próximo pedido de inclusão ou remoção válido recebe HTTP `503`. A interface volta ao estado anterior e mostra uma mensagem de erro. Clique novamente para concluir a operação.
+
 ## Cenários da API simulada
 
 | Variável               | Valor   | Comportamento                                             |
@@ -150,13 +167,17 @@ VITE_MOCK_CART_EDITS=error npm run dev:mocks
 
 Para restaurar as respostas padrão, reinicie o servidor com `npm run dev:mocks`, sem as variáveis de cenário.
 
-O mock guarda a sessão, as contas cadastradas, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Execute o trecho abaixo no console do navegador para limpar esses dados e voltar às contas de demonstração originais.
+O mock guarda a sessão, as contas cadastradas, os favoritos, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Execute o trecho abaixo no console do navegador para limpar esses dados e voltar às contas de demonstração originais.
 
 ```js
 localStorage.removeItem('kurio:guest-cart:v1')
 localStorage.removeItem('kurio:carts:v1')
 localStorage.removeItem('kurio:mock-session:v1')
 localStorage.removeItem('kurio:mock-users:v1')
+localStorage.removeItem('kurio:mock-favorites-fail-next:v1')
+for (const key of Object.keys(localStorage)) {
+  if (key.startsWith('kurio:favorites:v1:')) localStorage.removeItem(key)
+}
 location.reload()
 ```
 
@@ -174,12 +195,17 @@ O servidor de desenvolvimento e o preview usam portas diferentes. Limpe as chave
 | `DELETE` | `/api/cart/items/:itemId` | Remove a linha e retorna o carrinho atualizado.                                                                                                                                                                                 |
 | `PUT`    | `/api/cart/coupon`        | Recebe `{ code }`, aplica o cupom válido e retorna o carrinho com a cotação atualizada.                                                                                                                                         |
 | `DELETE` | `/api/cart/coupon`        | Remove o cupom e retorna o carrinho com a cotação atualizada.                                                                                                                                                                   |
+| `GET`    | `/api/favorites`          | Retorna `{ items }` com os NFTs salvos pela conta autenticada.                                                                                                                                                                  |
+| `PUT`    | `/api/favorites/:nftId`   | Salva o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                  |
+| `DELETE` | `/api/favorites/:nftId`   | Remove o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                 |
 | `POST`   | `/api/auth/login`         | Recebe `{ email, password }`, transfere o carrinho de visitante para a conta e retorna a sessão. Dados inválidos retornam HTTP `400` com `INVALID_INPUT`. Credenciais incorretas retornam HTTP `401` com `INVALID_CREDENTIALS`. |
 | `POST`   | `/api/auth/register`      | Recebe `{ username, email, password }` e retorna HTTP `201` com `{ email }`. Responde com `422 VALIDATION_ERROR` ou `409 ACCOUNT_CONFLICT`, ambos com mensagens em `fields`.                                                    |
 | `GET`    | `/api/auth/session`       | Retorna a sessão atual ou `{ session: null }`. Sessão expirada retorna HTTP `401` com `SESSION_EXPIRED`.                                                                                                                        |
 | `DELETE` | `/api/auth/session`       | Encerra a sessão e retorna HTTP `204`.                                                                                                                                                                                          |
 
 O mock resolve o carrinho a partir da sessão. O cliente envia `X-Cart-Scope` para indicar o carrinho que espera encontrar. Se a sessão tiver mudado, a API retorna HTTP `409` com `CART_SCOPE_CHANGED`. A fusão grava o carrinho da conta e esvazia o carrinho de visitante na mesma atualização do armazenamento. O mock ainda lê dados da chave legada `kurio:guest-cart:v1` até a primeira gravação no formato novo.
+
+Os endpoints de favoritos exigem sessão válida. O mock usa a sessão para resolver a conta e confere o cabeçalho `X-Favorites-User` para recusar operações emitidas sob outra sessão. A API retorna HTTP `401` sem sessão, `409` quando a conta mudou e `404` em operações para um NFT inexistente.
 
 Cada linha do carrinho representa um par de NFT e edição. O mock persiste os IDs, as quantidades e o código aplicado e consulta as fixtures para montar os preços e o estoque. A cotação é recalculada quando a quantidade, os itens ou o cupom mudam. As quantidades são inteiras. Os valores em ETH trafegam como strings decimais, e os cálculos de preço usam `BigInt` em wei.
 
@@ -203,6 +229,8 @@ tests/
 O TanStack Query usa os filtros validados como parte da chave da listagem, o ID como parte da chave do detalhe e uma chave por carrinho, `['cart', 'guest']` ou `['cart', 'user:<id>']`. As consultas passam o `AbortSignal` ao Axios. Os fluxos atuais oferecem nova tentativa pela interface quando uma consulta falha.
 
 As mutações do carrinho atualizam o cache com a resposta da API. Se uma edição falhar, o carrinho é consultado novamente para reconciliar o estado exibido com o mock.
+
+Favoritos usam `['favorites', userId]`. O botão mostra a inclusão ou remoção enquanto a API responde. Uma falha devolve o botão ao estado confirmado. A resposta bem-sucedida atualiza a lista da conta ativa, e as consultas e mutations de favoritos da conta anterior são removidas do cache na troca de sessão.
 
 A sessão usa a chave `['session']`. Na troca de carrinho, as queries e mutations em cache do carrinho anterior são removidas. Após login ou logout, as consultas de sessão pendentes são canceladas e o cache recebe o estado confirmado pela API.
 
@@ -228,6 +256,12 @@ Os testes de cadastro verificam o preenchimento do e-mail na aba **Entrar**, a r
 
 ```bash
 npm run test:e2e -- auth.spec.ts registration.spec.ts
+```
+
+Para verificar a persistência, a troca de conta e a recuperação de falha dos favoritos, execute a suíte abaixo.
+
+```bash
+npm run test:e2e -- favorites.spec.ts
 ```
 
 Abra o relatório HTML com:

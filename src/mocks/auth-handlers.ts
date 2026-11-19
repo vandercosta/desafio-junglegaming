@@ -71,14 +71,18 @@ function readSession(): StoredSession | null {
   }
 }
 
-export function getMockCartScope() {
+export function getMockUserId(): string | undefined {
   const stored = readSession()
   const user =
     stored && stored.expiresAt > Date.now()
       ? listUsers().find((candidate) => candidate.id === stored.userId)
       : undefined
 
-  return cartScopeForUser(user?.id)
+  return user?.id
+}
+
+export function getMockCartScope() {
+  return cartScopeForUser(getMockUserId())
 }
 
 async function derivePasswordVerifier(

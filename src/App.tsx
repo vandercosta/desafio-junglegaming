@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import FavoriteButton from '@/features/favorites/favorite-button'
 import { Button } from '@/components/ui/button'
 import { listNfts } from '@/features/catalog/catalog-api'
 import { Link, useNavigate, useSearch } from '@tanstack/react-router'
@@ -74,6 +75,9 @@ export default function App() {
                 </Link>
               </h2>
               <p>{nft.priceEth.replace('.', ',')} ETH</p>
+              <div className="mt-3">
+                <FavoriteButton nft={nft} />
+              </div>
             </li>
           ))}
         </ul>

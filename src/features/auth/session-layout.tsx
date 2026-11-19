@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Link,
   Outlet,
   useLocation,
   useNavigate,
@@ -22,6 +23,7 @@ import {
 import RegisterForm from './register-form'
 import { cartQueriesKey } from '@/features/cart/cart-api'
 import { getCartScope } from '@/features/cart/cart-session'
+import { favoritesQueriesKey } from '@/features/favorites/favorites-api'
 
 export default function SessionLayout() {
   const authMode = useLocation({
@@ -41,18 +43,26 @@ export default function SessionLayout() {
   const cartScope = getCartScope(sessionQuery.data)
 
   useEffect(() => {
-    queryClient.removeQueries({
-      queryKey: cartQueriesKey,
-      predicate: (query) => query.queryKey[1] !== cartScope,
-    })
+    function clearOtherAccounts(
+      queryKey: readonly string[],
+      activeScope?: string,
+    ) {
+      queryClient.removeQueries({
+        queryKey,
+        predicate: (query) => query.queryKey[1] !== activeScope,
+      })
 
-    const mutations = queryClient.getMutationCache()
-    for (const mutation of mutations.findAll({ mutationKey: cartQueriesKey })) {
-      if (mutation.options.mutationKey?.[1] !== cartScope) {
-        mutations.remove(mutation)
+      const mutations = queryClient.getMutationCache()
+      for (const mutation of mutations.findAll({ mutationKey: queryKey })) {
+        if (mutation.options.mutationKey?.[1] !== activeScope) {
+          mutations.remove(mutation)
+        }
       }
     }
-  }, [cartScope, queryClient])
+
+    clearOtherAccounts(cartQueriesKey, cartScope)
+    clearOtherAccounts(favoritesQueriesKey, user?.id)
+  }, [cartScope, queryClient, user?.id])
 
   useEffect(() => {
     if (!session) return
@@ -188,6 +198,9 @@ export default function SessionLayout() {
         {user ? (
           <div className="flex items-center gap-3">
             <p>{user.displayName}</p>
+            <Link to="/favoritos" className="underline">
+              Lista de interesse
+            </Link>
             <Button
               type="button"
               disabled={logout.isPending}
