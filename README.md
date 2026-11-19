@@ -16,9 +16,10 @@ Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Ku
 - Cadastro de colecionadores com validação por campo, tratamento de conflitos e persistência das contas de demonstração.
 - Favoritos no catálogo e no detalhe, com lista de interesse persistida por conta e retorno ao estado anterior em caso de falha.
 - Perfil do colecionador com edição de dados, avatar e alteração de senha.
+- Cadastro e edição de carteiras principal e secundária, com validação por rede e persistência por conta.
 - Estados de carregamento, lista vazia, erro e recurso inexistente.
 
-Carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
+Checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
 
 ## Tecnologias
 
@@ -128,6 +129,15 @@ Entre com uma conta de demonstração e selecione **Meu perfil** no cabeçalho o
 - Em **Alterar senha**, informe a senha atual e confirme a nova senha. Para testar a rejeição, use uma senha atual incorreta e mantenha os demais campos válidos. Após salvar, a sessão atual continua ativa. Use o e-mail e a senha atualizados no próximo login.
 - O reset abaixo restaura as credenciais e os dados originais das contas de demonstração.
 
+## Carteiras
+
+Entre com uma conta de demonstração e abra **Meu perfil → Carteiras** ou acesse `/perfil/carteiras`. Em **Carteira principal**, clique em **Adicionar carteira**, informe apelido, rede, tipo de carteira e endereço público e salve. Nome ENS e código de indicação são opcionais. Nome e e-mail do colecionador ficam no perfil.
+
+- Em **Carteira secundária**, você pode cadastrar outro endereço ou marcar **Igual à carteira principal**. A segunda opção acompanha alterações futuras da principal.
+- Para testar a validação de Ethereum ou Polygon, envie `0x123`. Depois, teste o formato esperado com `0x1111111111111111111111111111111111111111`. Na rede Solana, a API aceita endereços Base58 que decodificam para 32 bytes.
+- Para verificar conflito, tente cadastrar como secundária o mesmo endereço e rede da principal. O formulário preserva os dados digitados e mostra o erro no campo de endereço.
+- Recarregue a página e troque de conta para verificar a persistência e o isolamento. O cadastro armazena dados simulados de endereços públicos.
+
 ## Cenários da API simulada
 
 | Variável               | Valor   | Comportamento                                             |
@@ -177,7 +187,7 @@ VITE_MOCK_CART_EDITS=error npm run dev:mocks
 
 Para restaurar as respostas padrão, reinicie o servidor com `npm run dev:mocks`, sem as variáveis de cenário.
 
-O mock guarda a sessão, as contas cadastradas, as alterações de perfil e senha, os favoritos, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Execute o trecho abaixo no console do navegador para limpar esses dados e voltar às contas de demonstração originais.
+O mock guarda a sessão, as contas cadastradas, as alterações de perfil e senha, as carteiras, os favoritos, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Execute o trecho abaixo no console do navegador para limpar esses dados e voltar às contas de demonstração originais.
 
 ```js
 localStorage.removeItem('kurio:guest-cart:v1')
@@ -186,7 +196,12 @@ localStorage.removeItem('kurio:mock-session:v1')
 localStorage.removeItem('kurio:mock-users:v1')
 localStorage.removeItem('kurio:mock-favorites-fail-next:v1')
 for (const key of Object.keys(localStorage)) {
-  if (key.startsWith('kurio:favorites:v1:')) localStorage.removeItem(key)
+  if (
+    key.startsWith('kurio:favorites:v1:') ||
+    key.startsWith('kurio:wallets:v1:')
+  ) {
+    localStorage.removeItem(key)
+  }
 }
 location.reload()
 ```
@@ -208,6 +223,9 @@ O servidor de desenvolvimento e o preview usam portas diferentes. Limpe as chave
 | `GET`    | `/api/favorites`          | Retorna `{ items }` com os NFTs salvos pela conta autenticada.                                                                                                                                                                  |
 | `PUT`    | `/api/favorites/:nftId`   | Salva o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                  |
 | `DELETE` | `/api/favorites/:nftId`   | Remove o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                 |
+| `GET`    | `/api/wallets`            | Retorna `{ primary, secondary }` para a conta autenticada.                                                                                                                                                                      |
+| `PUT`    | `/api/wallets/principal`  | Cadastra ou substitui os dados da carteira principal e retorna as duas posições.                                                                                                                                                |
+| `PUT`    | `/api/wallets/secundaria` | Recebe `{ kind: 'independent', wallet }` ou `{ kind: 'same-as-primary' }` e retorna as duas posições.                                                                                                                           |
 | `GET`    | `/api/profile`            | Retorna os dados e o avatar da conta autenticada.                                                                                                                                                                               |
 | `PUT`    | `/api/profile`            | Atualiza dados e avatar e retorna `{ profile, user }`. Conflitos de e-mail ou nome de usuário retornam HTTP `409`.                                                                                                              |
 | `PUT`    | `/api/profile/password`   | Recebe `{ currentPassword, newPassword }` e retorna HTTP `204`. Senha incorreta ou inválida retorna HTTP `422` com mensagens por campo.                                                                                         |
@@ -221,6 +239,8 @@ O mock resolve o carrinho a partir da sessão. O cliente envia `X-Cart-Scope` pa
 Os endpoints de favoritos exigem sessão válida. O mock usa a sessão para resolver a conta e confere o cabeçalho `X-Favorites-User` para recusar operações emitidas sob outra sessão. A API retorna HTTP `401` sem sessão, `409` quando a conta mudou e `404` em operações para um NFT inexistente.
 
 Os endpoints de perfil exigem sessão válida e usam `X-Profile-User` para recusar pedidos cujo usuário esperado difere da sessão. O mock persiste atualizações por ID e guarda apenas sal e verificador PBKDF2 para a senha.
+
+Os endpoints de carteiras exigem sessão. O mock confere `X-Wallets-User` com a conta ativa. A API responde com HTTP `422` para dados inválidos e `409` para endereço duplicado na mesma rede, sessão trocada ou referência à principal ainda indisponível.
 
 Cada linha do carrinho representa um par de NFT e edição. O mock persiste os IDs, as quantidades e o código aplicado e consulta as fixtures para montar os preços e o estoque. A cotação é recalculada quando a quantidade, os itens ou o cupom mudam. As quantidades são inteiras. Os valores em ETH trafegam como strings decimais, e os cálculos de preço usam `BigInt` em wei.
 
@@ -248,6 +268,8 @@ As mutações do carrinho atualizam o cache com a resposta da API. Se uma ediç�
 Favoritos usam `['favorites', userId]`. O botão mostra a inclusão ou remoção enquanto a API responde. Uma falha devolve o botão ao estado confirmado. A resposta bem-sucedida atualiza a lista da conta ativa, e as consultas e mutations de favoritos da conta anterior são removidas do cache na troca de sessão.
 
 O perfil usa `['profile', userId]`. Ao salvar, o cache recebe o perfil confirmado e o nome e o e-mail são atualizados na sessão. Na troca de conta, o cache do perfil anterior é removido.
+
+As carteiras usam `['wallets', userId]`. A API retorna o estado completo após salvar. Na troca de conta, as consultas e mutations do usuário anterior saem do cache.
 
 A sessão usa a chave `['session']`. Na troca de carrinho, as queries e mutations em cache do carrinho anterior são removidas. Após login ou logout, as consultas de sessão pendentes são canceladas e o cache recebe o estado confirmado pela API.
 
@@ -285,6 +307,12 @@ Para verificar a edição do perfil, o avatar, a troca de conta e a alteração 
 
 ```bash
 npm run test:e2e -- profile.spec.ts
+```
+
+Para verificar as carteiras, execute a suíte de validação, persistência e isolamento.
+
+```bash
+npm run test:e2e -- wallets.spec.ts
 ```
 
 Abra o relatório HTML com:

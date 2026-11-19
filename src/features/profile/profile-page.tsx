@@ -4,31 +4,14 @@ import { sessionQueryOptions } from '@/features/auth/auth-api'
 import { Button } from '@/components/ui/button'
 import { getProfile, profileQueryKey } from './profile-api'
 import { PasswordForm, ProfileForm } from './profile-forms'
+import AccountNavigation from './account-navigation'
 
 export default function ProfilePage() {
   const session = useQuery(sessionQueryOptions)
   const userId = session.data?.session?.user.id
   return (
     <main className="mx-auto grid max-w-5xl gap-6 p-6 md:grid-cols-[13rem_minmax(0,1fr)]">
-      <aside className="grid content-start gap-3 rounded-md border p-4">
-        <p className="font-semibold">Meu perfil</p>
-        <nav
-          aria-label="Conta do colecionador"
-          className="flex flex-wrap gap-3 md:grid"
-        >
-          <Link to="/perfil" aria-current="page" className="underline">
-            Dados do perfil
-          </Link>
-          {userId && (
-            <Link to="/favoritos" className="underline">
-              Lista de interesse
-            </Link>
-          )}
-          <Link to="/" className="underline">
-            Voltar ao catálogo
-          </Link>
-        </nav>
-      </aside>
+      <AccountNavigation signedIn={Boolean(userId)} />
       <section
         aria-labelledby="profile-heading"
         className="grid content-start gap-5"
