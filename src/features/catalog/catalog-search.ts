@@ -1,3 +1,5 @@
+export const catalogFiltersHash = 'filtros'
+
 export const catalogOptions = {
   collection: {
     'arte-digital': 'Arte digital',

@@ -150,7 +150,7 @@ export default function NftDetailPage() {
   const nft = detail.data
 
   return (
-    <main className="mx-auto grid max-w-5xl gap-6 p-6">
+    <main className="page-shell grid gap-6 py-6">
       <Link to="/" search={search} className="w-fit underline">
         Voltar ao catálogo
       </Link>
@@ -181,7 +181,7 @@ export default function NftDetailPage() {
           <FavoriteButton nft={nft} />
           <section aria-labelledby="nft-about">
             <h2 id="nft-about">Sobre este NFT</h2>
-            <p>{nft.description}</p>
+            <p className="text-muted-foreground">{nft.description}</p>
           </section>
 
           <EditionPicker
@@ -192,7 +192,7 @@ export default function NftDetailPage() {
             search={search}
           />
 
-          <dl>
+          <dl className="text-metadata-foreground">
             <div>
               <dt>ID do token</dt>
               <dd>#{nft.id}</dd>

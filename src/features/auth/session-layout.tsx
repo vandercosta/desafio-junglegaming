@@ -7,8 +7,10 @@ import {
   useRouter,
 } from '@tanstack/react-router'
 import axios from 'axios'
+import loginIcon from '@/assets/icons/login.svg'
 import { Dialog, Tabs } from 'radix-ui'
 import { useEffect, useRef, type SubmitEvent, useState } from 'react'
+import SiteHeader from '@/components/site-header'
 import { Button } from '@/components/ui/button'
 import {
   sessionQueryOptions,
@@ -21,6 +23,7 @@ import {
   type SessionState,
 } from './auth-api'
 import RegisterForm from './register-form'
+import CatalogMobileControls from '@/features/catalog/catalog-mobile-controls'
 import { cartQueriesKey } from '@/features/cart/cart-api'
 import { getCartScope } from '@/features/cart/cart-session'
 import { favoritesQueriesKey } from '@/features/favorites/favorites-api'
@@ -33,12 +36,15 @@ export default function SessionLayout() {
   const authMode = useLocation({
     select: (location) => location.search.auth,
   })
+  const isHome = useLocation({
+    select: (location) => location.pathname === '/',
+  })
   const router = useRouter()
   const [registeredEmail, setRegisteredEmail] = useState('')
 
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const brandRef = useRef<HTMLParagraphElement>(null)
+  const brandRef = useRef<HTMLAnchorElement>(null)
   const entryRef = useRef<HTMLButtonElement>(null)
 
   const sessionQuery = useQuery(sessionQueryOptions)
@@ -90,6 +96,7 @@ export default function SessionLayout() {
       to: '.',
       search: (previous) => ({ ...previous, auth: mode }),
       hash: true,
+      hashScrollIntoView: false,
       replace,
       resetScroll: false,
     })
@@ -178,57 +185,73 @@ export default function SessionLayout() {
         setAuthMode(open ? 'entrar' : undefined, !open)
       }}
     >
-      <header className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-4">
-        <p ref={brandRef} tabIndex={-1} className="font-semibold">
-          Kurio
-        </p>
+      <SiteHeader
+        brandRef={brandRef}
+        cartScope={cartScope}
+        mobileCatalog={isHome ? <CatalogMobileControls /> : null}
+        account={
+          user ? (
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-sm">
+              <p className="max-w-full truncate">{user.displayName}</p>
+              <Link to="/perfil" className="underline">
+                Meu perfil
+              </Link>
+              <Link to="/favoritos" className="underline">
+                Lista de interesse
+              </Link>
+              <Button
+                type="button"
+                disabled={logout.isPending}
+                onClick={() => logout.mutate()}
+              >
+                {logout.isPending ? 'Saindo…' : 'Sair'}
+              </Button>
+            </div>
+          ) : sessionQuery.data !== undefined ? (
+            <Dialog.Trigger asChild>
+              <Button
+                ref={entryRef}
+                type="button"
+                size="lg"
+                className="px-3 lg:ml-4 lg:h-[35px] lg:w-[100px] lg:text-base/none lg:font-medium"
+              >
+                <img
+                  src={loginIcon}
+                  alt=""
+                  className="size-4 shrink-0 lg:size-5"
+                />
+                Entrar
+              </Button>
+            </Dialog.Trigger>
+          ) : null
+        }
+        status={
+          <>
+            {sessionQuery.isPending && <p role="status">Verificando sessão…</p>}
 
-        {sessionQuery.isPending && <p role="status">Verificando sessão…</p>}
+            {sessionQuery.isError && (
+              <div>
+                <p role="alert">Não foi possível consultar a sessão.</p>
+                <Button
+                  type="button"
+                  disabled={sessionQuery.isFetching}
+                  onClick={() => void sessionQuery.refetch()}
+                >
+                  Tentar novamente
+                </Button>
+              </div>
+            )}
 
-        {sessionQuery.isError && (
-          <div>
-            <p role="alert">Não foi possível consultar a sessão.</p>
-            <Button
-              type="button"
-              disabled={sessionQuery.isFetching}
-              onClick={() => void sessionQuery.refetch()}
-            >
-              Tentar novamente
-            </Button>
-          </div>
-        )}
+            {sessionQuery.data?.expired && (
+              <p role="alert">Sua sessão expirou. Entre novamente.</p>
+            )}
 
-        {sessionQuery.data?.expired && (
-          <p role="alert">Sua sessão expirou. Entre novamente.</p>
-        )}
-
-        {user ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <p>{user.displayName}</p>
-            <Link to="/perfil" className="underline">
-              Meu perfil
-            </Link>
-            <Link to="/favoritos" className="underline">
-              Lista de interesse
-            </Link>
-            <Button
-              type="button"
-              disabled={logout.isPending}
-              onClick={() => logout.mutate()}
-            >
-              {logout.isPending ? 'Saindo…' : 'Sair'}
-            </Button>
-          </div>
-        ) : sessionQuery.data !== undefined ? (
-          <Dialog.Trigger asChild>
-            <Button ref={entryRef} type="button">
-              Entrar
-            </Button>
-          </Dialog.Trigger>
-        ) : null}
-
-        {logout.isError && <p role="alert">Não foi possível sair da conta.</p>}
-      </header>
+            {logout.isError && (
+              <p role="alert">Não foi possível sair da conta.</p>
+            )}
+          </>
+        }
+      />
 
       <RealtimeProvider
         userId={

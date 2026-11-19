@@ -10,7 +10,7 @@ export default function FavoritesPage() {
   const userId = session.data?.session?.user.id
 
   return (
-    <main className="mx-auto grid max-w-5xl gap-4 p-6">
+    <main className="page-shell grid gap-4 py-6">
       <Link to="/" className="w-fit underline">
         Voltar ao catálogo
       </Link>

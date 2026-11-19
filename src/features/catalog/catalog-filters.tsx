@@ -17,27 +17,40 @@ const prices = [
 type Props = {
   search: CatalogSearch
   onApply: (search: CatalogSearch) => void
+  showSearch?: boolean
+  searchInputId?: string
 }
 
-export default function CatalogFilters({ search, onApply }: Props) {
+const fieldClassName =
+  'min-w-0 rounded-md border border-input bg-background p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring'
+
+export default function CatalogFilters({
+  search,
+  onApply,
+  showSearch = true,
+  searchInputId,
+}: Props) {
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
     const fields = new FormData(event.currentTarget)
-    onApply(parseCatalogSearch(Object.fromEntries(fields)))
+    onApply(parseCatalogSearch({ q: search.q, ...Object.fromEntries(fields) }))
   }
 
   return (
     <form onSubmit={handleSubmit} className="my-4 grid gap-4 sm:grid-cols-2">
-      <label className="grid gap-1">
-        Buscar NFTs
-        <input
-          key={search.q ?? ''}
-          type="search"
-          name="q"
-          defaultValue={search.q}
-          className="rounded-md border p-2"
-        />
-      </label>
+      {showSearch && (
+        <label className="grid gap-1">
+          Buscar NFTs
+          <input
+            key={search.q ?? ''}
+            id={searchInputId}
+            type="search"
+            name="q"
+            defaultValue={search.q}
+            className={fieldClassName}
+          />
+        </label>
+      )}
 
       {selects.map(({ name, label, empty }) => (
         <label key={name} className="grid gap-1">
@@ -46,7 +59,7 @@ export default function CatalogFilters({ search, onApply }: Props) {
             key={search[name] ?? ''}
             name={name}
             defaultValue={search[name] ?? ''}
-            className="rounded-md border p-2"
+            className={fieldClassName}
           >
             <option value="">{empty}</option>
             {Object.entries(catalogOptions[name]).map(([value, text]) => (
@@ -67,7 +80,7 @@ export default function CatalogFilters({ search, onApply }: Props) {
             inputMode="decimal"
             pattern="[0-9]+([.,][0-9]{1,18})?"
             defaultValue={search[name]}
-            className="rounded-md border p-2"
+            className={fieldClassName}
           />
         </label>
       ))}

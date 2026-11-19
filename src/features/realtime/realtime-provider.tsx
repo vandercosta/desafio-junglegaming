@@ -285,7 +285,7 @@ export default function RealtimeProvider({
         <p
           role="status"
           aria-label="Conexão em tempo real"
-          className="mx-auto max-w-5xl px-6 text-xs text-muted-foreground"
+          className="page-shell text-xs text-muted-foreground"
         >
           {connectionLabels[current.status]}
         </p>

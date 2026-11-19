@@ -10,7 +10,7 @@ export default function ProfilePage() {
   const session = useQuery(sessionQueryOptions)
   const userId = session.data?.session?.user.id
   return (
-    <main className="mx-auto grid max-w-5xl gap-6 p-6 md:grid-cols-[13rem_minmax(0,1fr)]">
+    <main className="page-shell grid gap-6 py-6 md:grid-cols-[13rem_minmax(0,1fr)]">
       <AccountNavigation signedIn={Boolean(userId)} />
       <section
         aria-labelledby="profile-heading"

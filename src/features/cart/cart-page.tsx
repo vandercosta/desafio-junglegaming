@@ -27,7 +27,7 @@ export default function CartPage() {
 
   if (scope === undefined) {
     return (
-      <main className="mx-auto grid max-w-5xl gap-6 p-6">
+      <main className="page-shell grid gap-6 py-6">
         <h1 className="text-2xl font-semibold">Carrinho</h1>
         <p role="status">Aguardando a verificação da sessão…</p>
       </main>
@@ -111,7 +111,7 @@ function ScopedCart({ scope }: { scope: CartScope }) {
       errorData?.code === 'COUPON_EXPIRED')
 
   return (
-    <main className="mx-auto grid max-w-5xl gap-6 p-6">
+    <main className="page-shell grid gap-6 py-6">
       <h1 className="text-2xl font-semibold">Carrinho</h1>
 
       {editCart.isPending && <p role="status">Atualizando carrinho…</p>}

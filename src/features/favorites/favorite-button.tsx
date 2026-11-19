@@ -35,14 +35,14 @@ export default function FavoriteButton({ nft }: { nft: FavoriteNft }) {
 
   if (data === undefined) {
     return (
-      <Button type="button" variant="outline" disabled>
+      <Button type="button" variant="outline-primary" disabled>
         Favoritar
       </Button>
     )
   }
 
   return (
-    <Button variant="outline" asChild>
+    <Button variant="outline-primary" asChild>
       <Link
         to="."
         search={(previous) => ({ ...previous, auth: 'entrar' })}
@@ -113,7 +113,7 @@ function AccountFavoriteButton({
     <div className="grid justify-items-start gap-1">
       <Button
         type="button"
-        variant="outline"
+        variant="outline-primary"
         aria-label={`Favoritar ${nft.name}`}
         aria-pressed={saved}
         disabled={favorites.isPending || mutation.isPending || mutationsPending}

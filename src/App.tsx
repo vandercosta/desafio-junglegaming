@@ -2,11 +2,23 @@ import { useQuery } from '@tanstack/react-query'
 import FavoriteButton from '@/features/favorites/favorite-button'
 import { Button } from '@/components/ui/button'
 import { listNfts } from '@/features/catalog/catalog-api'
-import { Link, useNavigate, useSearch } from '@tanstack/react-router'
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearch,
+} from '@tanstack/react-router'
 import CatalogFilters from '@/features/catalog/catalog-filters'
-import { parseCatalogSearch } from '@/features/catalog/catalog-search'
+import {
+  catalogFiltersHash,
+  parseCatalogSearch,
+  type CatalogSearch,
+} from '@/features/catalog/catalog-search'
 
 export default function App() {
+  const showFilters = useLocation({
+    select: ({ hash }) => hash === catalogFiltersHash,
+  })
   const search = useSearch({ from: '/', select: parseCatalogSearch })
   const navigate = useNavigate({ from: '/' })
   const page = search.page ?? 1
@@ -22,26 +34,38 @@ export default function App() {
     ? Math.ceil(catalog.data.total / catalog.data.pageSize)
     : 0
 
+  function applyFilters(nextSearch: CatalogSearch) {
+    void navigate({
+      search: (previous) => ({ ...previous, ...nextSearch }),
+      hash: true,
+      hashScrollIntoView: false,
+      resetScroll: false,
+    })
+  }
+
   function goToPage(nextPage: number) {
     void navigate({
       search: (previous) => ({
         ...previous,
         page: nextPage === 1 ? undefined : nextPage,
       }),
+      hash: true,
     })
   }
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <main id="catalogo" className="page-shell scroll-mt-4 py-6">
       <h1 className="text-2xl font-semibold">Catálogo de NFTs</h1>
-      <Link to="/carrinho" search={search} className="underline">
-        Carrinho
-      </Link>
 
-      <CatalogFilters
-        search={search}
-        onApply={(nextSearch) => void navigate({ search: nextSearch })}
-      />
+      {showFilters && (
+        <div id={catalogFiltersHash} className="hidden lg:block">
+          <CatalogFilters
+            search={search}
+            onApply={applyFilters}
+            searchInputId="catalog-search"
+          />
+        </div>
+      )}
 
       {catalog.isPending && <p role="status">Carregando NFTs…</p>}
 

@@ -35,7 +35,7 @@ export default function CheckoutPage() {
   const userId = session.data?.session?.user.id
 
   return (
-    <main className="mx-auto grid w-full max-w-5xl gap-5 p-6">
+    <main className="page-shell grid gap-5 py-6">
       <nav
         aria-label="Caminho da página"
         className="flex flex-wrap gap-2 text-sm"
