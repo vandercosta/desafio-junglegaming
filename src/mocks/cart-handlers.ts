@@ -1,15 +1,22 @@
-import { delay, http, HttpResponse } from 'msw'
-import type { CartResponse, CartSelection } from '@/features/cart/cart-api'
+import { delay, http, HttpResponse, type HttpResponseResolver } from 'msw'
+import type {
+  CartResponse,
+  CartScope,
+  CartSelection,
+} from '@/features/cart/cart-api'
 import { fromWei, toWei } from '@/lib/eth'
 import { nftEditions, nfts } from './fixtures/nfts'
+import { getMockCartScope } from './auth-handlers'
+import {
+  cartStorageLock,
+  isCartSelection,
+  isQuantity,
+  readCart,
+  writeCart,
+  type CartState,
+} from './cart-store'
 
-const storageKey = 'kurio:guest-cart:v1'
 const networkFee = toWei('0.016')
-
-type CartState = {
-  selections: CartSelection[]
-  couponCode: string | null
-}
 
 type Coupon = {
   code: string
@@ -26,51 +33,8 @@ const coupons: Coupon[] = [
   },
 ]
 
-function isCartSelection(value: unknown): value is CartSelection {
-  if (typeof value !== 'object' || value === null) return false
-
-  const { nftId, editionId, quantity } = value as Partial<CartSelection>
-
-  return (
-    typeof nftId === 'string' &&
-    typeof editionId === 'string' &&
-    isQuantity(quantity)
-  )
-}
-
-function readCart(): CartState {
-  const stored = localStorage.getItem(storageKey)
-  let data: unknown
-  try {
-    data = JSON.parse(stored ?? 'null')
-  } catch {
-    data = null
-  }
-
-  if (Array.isArray(data)) {
-    return { selections: data.filter(isCartSelection), couponCode: null }
-  }
-
-  if (typeof data === 'object' && data !== null) {
-    const { selections, couponCode } = data as Partial<CartState>
-
-    return {
-      selections: Array.isArray(selections)
-        ? selections.filter(isCartSelection)
-        : [],
-      couponCode: typeof couponCode === 'string' ? couponCode : null,
-    }
-  }
-
-  return { selections: [], couponCode: null }
-}
-
 function cartItemId(selection: CartSelection): string {
   return `${selection.nftId}:${selection.editionId}`
-}
-
-function isQuantity(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
 function isCouponExpired(coupon: Coupon, now: number): boolean {
@@ -125,15 +89,46 @@ function buildCart(state: CartState, now = Date.now()): CartResponse {
   }
 }
 
-function persistCart(state: CartState, cart = buildCart(state)) {
-  localStorage.setItem(
-    storageKey,
-    JSON.stringify({
-      selections: state.selections,
-      couponCode: cart.couponCode,
-    }),
-  )
+function persistCart(
+  scope: CartScope,
+  state: CartState,
+  cart = buildCart(state),
+) {
+  writeCart(scope, {
+    selections: state.selections,
+    couponCode: cart.couponCode,
+  })
   return HttpResponse.json(cart)
+}
+
+function cartHandler(
+  method: 'get' | 'post' | 'patch' | 'put' | 'delete',
+  path: string,
+  resolve: (
+    context: Parameters<HttpResponseResolver>[0],
+    scope: CartScope,
+  ) => Response | Promise<Response>,
+) {
+  return http[method](path, async (context) => {
+    if (method !== 'get') await delay(350)
+
+    return navigator.locks.request(cartStorageLock, () => {
+      const scope = getMockCartScope()
+      const expectedScope = context.request.headers.get('X-Cart-Scope')
+
+      if (expectedScope !== null && expectedScope !== scope) {
+        return HttpResponse.json(
+          {
+            code: 'CART_SCOPE_CHANGED',
+            message: 'A sessão mudou. Tente novamente com a sessão atual.',
+          },
+          { status: 409 },
+        )
+      }
+
+      return resolve(context, scope)
+    })
+  })
 }
 
 function simulatedEditFailure() {
@@ -146,13 +141,11 @@ function simulatedEditFailure() {
 }
 
 export const cartHandlers = [
-  http.get('/api/cart', () => {
-    return HttpResponse.json(buildCart(readCart()))
+  cartHandler('get', '/api/cart', (_context, scope) => {
+    return HttpResponse.json(buildCart(readCart(scope)))
   }),
 
-  http.post('/api/cart/items', async ({ request }) => {
-    await delay(350)
-
+  cartHandler('post', '/api/cart/items', async ({ request }, scope) => {
     const input: unknown = await request.json().catch(() => null)
 
     if (!isCartSelection(input)) {
@@ -172,7 +165,7 @@ export const cartHandlers = [
       )
     }
 
-    const state = readCart()
+    const state = readCart(scope)
     const { selections } = state
     const index = selections.findIndex(
       (item) =>
@@ -192,77 +185,79 @@ export const cartHandlers = [
     if (index === -1) selections.push(next)
     else selections[index] = next
 
-    return persistCart(state)
+    return persistCart(scope, state)
   }),
 
-  http.patch('/api/cart/items/:itemId', async ({ params, request }) => {
-    await delay(350)
+  cartHandler(
+    'patch',
+    '/api/cart/items/:itemId',
+    async ({ params, request }, scope) => {
+      const failure = simulatedEditFailure()
+      if (failure) return failure
 
-    const failure = simulatedEditFailure()
-    if (failure) return failure
+      const body: unknown = await request.json().catch(() => null)
+      const quantity =
+        typeof body === 'object' && body !== null && 'quantity' in body
+          ? body.quantity
+          : undefined
 
-    const body: unknown = await request.json().catch(() => null)
-    const quantity =
-      typeof body === 'object' && body !== null && 'quantity' in body
-        ? body.quantity
-        : undefined
+      if (!isQuantity(quantity)) {
+        return HttpResponse.json(
+          { message: 'Informe uma quantidade inteira maior que zero.' },
+          { status: 400 },
+        )
+      }
 
-    if (!isQuantity(quantity)) {
-      return HttpResponse.json(
-        { message: 'Informe uma quantidade inteira maior que zero.' },
-        { status: 400 },
+      const state = readCart(scope)
+      const { selections } = state
+      const item = selections.find(
+        (selection) => cartItemId(selection) === params.itemId,
       )
-    }
-
-    const state = readCart()
-    const { selections } = state
-    const item = selections.find(
-      (selection) => cartItemId(selection) === params.itemId,
-    )
-    const edition = nftEditions.find(
-      (candidate) => candidate.id === item?.editionId,
-    )
-
-    if (!item || !edition) {
-      return HttpResponse.json(
-        { message: 'Item do carrinho não encontrado.' },
-        { status: 404 },
+      const edition = nftEditions.find(
+        (candidate) => candidate.id === item?.editionId,
       )
-    }
 
-    if (quantity > edition.availableQuantity) {
-      return HttpResponse.json(
-        { message: 'A quantidade ultrapassa o estoque desta edição.' },
-        { status: 409 },
-      )
-    }
+      if (!item || !edition) {
+        return HttpResponse.json(
+          { message: 'Item do carrinho não encontrado.' },
+          { status: 404 },
+        )
+      }
 
-    return persistCart({
-      ...state,
-      selections: selections.map((selection) =>
-        selection === item ? { ...selection, quantity } : selection,
-      ),
-    })
-  }),
+      if (quantity > edition.availableQuantity) {
+        return HttpResponse.json(
+          { message: 'A quantidade ultrapassa o estoque desta edição.' },
+          { status: 409 },
+        )
+      }
 
-  http.delete('/api/cart/items/:itemId', async ({ params }) => {
-    await delay(350)
+      return persistCart(scope, {
+        ...state,
+        selections: selections.map((selection) =>
+          selection === item ? { ...selection, quantity } : selection,
+        ),
+      })
+    },
+  ),
 
-    const failure = simulatedEditFailure()
-    if (failure) return failure
+  cartHandler(
+    'delete',
+    '/api/cart/items/:itemId',
+    async ({ params }, scope) => {
+      const failure = simulatedEditFailure()
+      if (failure) return failure
 
-    const state = readCart()
-    return persistCart({
-      ...state,
-      selections: state.selections.filter(
-        (selection) => cartItemId(selection) !== params.itemId,
-      ),
-    })
-  }),
+      const state = readCart(scope)
+      return persistCart(scope, {
+        ...state,
+        selections: state.selections.filter(
+          (selection) => cartItemId(selection) !== params.itemId,
+        ),
+      })
+    },
+  ),
 
-  http.put('/api/cart/coupon', async ({ request }) => {
-    await delay(350)
-
+  cartHandler('put', '/api/cart/coupon', async ({ request }, scope) => {
     const body: unknown = await request.json().catch(() => null)
     const code =
       typeof body === 'object' && body !== null && 'code' in body
@@ -287,7 +282,7 @@ export const cartHandlers = [
       )
     }
 
-    const state = { ...readCart(), couponCode: coupon.code }
+    const state = { ...readCart(scope), couponCode: coupon.code }
     const cart = buildCart(state, now)
 
     if (cart.items.length === 0) {
@@ -311,12 +306,10 @@ export const cartHandlers = [
       )
     }
 
-    return persistCart(state, cart)
+    return persistCart(scope, state, cart)
   }),
 
-  http.delete('/api/cart/coupon', async () => {
-    await delay(350)
-
-    return persistCart({ ...readCart(), couponCode: null })
+  cartHandler('delete', '/api/cart/coupon', async (_context, scope) => {
+    return persistCart(scope, { ...readCart(scope), couponCode: null })
   }),
 ]

@@ -64,6 +64,12 @@ export async function getSession(signal: AbortSignal): Promise<SessionState> {
   }
 }
 
+export const sessionQueryOptions = {
+  queryKey: sessionQueryKey,
+  queryFn: ({ signal }: { signal: AbortSignal }) => getSession(signal),
+  retry: false,
+}
+
 export async function signIn(input: LoginInput): Promise<Session> {
   const { data } = await api.post<SessionResponse>('/auth/login', input)
 

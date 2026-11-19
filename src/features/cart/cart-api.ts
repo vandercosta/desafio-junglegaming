@@ -25,7 +25,21 @@ export type CartResponse = {
   hasStockConflict: boolean
 }
 
-export const guestCartQueryKey = ['cart', 'guest'] as const
+export type CartScope = 'guest' | `user:${string}`
+
+export const cartQueriesKey = ['cart'] as const
+
+export function cartScopeForUser(userId?: string): CartScope {
+  return userId === undefined ? 'guest' : `user:${userId}`
+}
+
+export function cartQueryKey(scope: CartScope) {
+  return [...cartQueriesKey, scope] as const
+}
+
+function cartRequest(scope: CartScope) {
+  return { headers: { 'X-Cart-Scope': scope } }
+}
 
 function validateCart(data: CartResponse): CartResponse {
   if (
@@ -43,44 +57,73 @@ function validateCart(data: CartResponse): CartResponse {
   return data
 }
 
-export async function getCart(signal: AbortSignal): Promise<CartResponse> {
-  const { data } = await api.get<CartResponse>('/cart', { signal })
+export async function getCart(
+  scope: CartScope,
+  signal: AbortSignal,
+): Promise<CartResponse> {
+  const { data } = await api.get<CartResponse>('/cart', {
+    ...cartRequest(scope),
+    signal,
+  })
   return validateCart(data)
 }
 
 export async function addCartItem(
+  scope: CartScope,
   selection: CartSelection,
 ): Promise<CartResponse> {
-  const { data } = await api.post<CartResponse>('/cart/items', selection)
+  const { data } = await api.post<CartResponse>(
+    '/cart/items',
+    selection,
+    cartRequest(scope),
+  )
   return validateCart(data)
 }
 
 export async function updateCartItemQuantity(
+  scope: CartScope,
   itemId: string,
   quantity: number,
 ): Promise<CartResponse> {
   const { data } = await api.patch<CartResponse>(
     `/cart/items/${encodeURIComponent(itemId)}`,
     { quantity },
+    cartRequest(scope),
   )
 
   return validateCart(data)
 }
 
-export async function removeCartItem(itemId: string): Promise<CartResponse> {
+export async function removeCartItem(
+  scope: CartScope,
+  itemId: string,
+): Promise<CartResponse> {
   const { data } = await api.delete<CartResponse>(
     `/cart/items/${encodeURIComponent(itemId)}`,
+    cartRequest(scope),
   )
 
   return validateCart(data)
 }
 
-export async function applyCartCoupon(code: string): Promise<CartResponse> {
-  const { data } = await api.put<CartResponse>('/cart/coupon', { code })
+export async function applyCartCoupon(
+  scope: CartScope,
+  code: string,
+): Promise<CartResponse> {
+  const { data } = await api.put<CartResponse>(
+    '/cart/coupon',
+    { code },
+    cartRequest(scope),
+  )
   return validateCart(data)
 }
 
-export async function removeCartCoupon(): Promise<CartResponse> {
-  const { data } = await api.delete<CartResponse>('/cart/coupon')
+export async function removeCartCoupon(
+  scope: CartScope,
+): Promise<CartResponse> {
+  const { data } = await api.delete<CartResponse>(
+    '/cart/coupon',
+    cartRequest(scope),
+  )
   return validateCart(data)
 }

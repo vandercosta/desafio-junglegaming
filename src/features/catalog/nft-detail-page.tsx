@@ -7,16 +7,23 @@ import type { NftEdition } from './catalog-api'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import axios from 'axios'
-import { addCartItem, guestCartQueryKey } from '@/features/cart/cart-api'
+import {
+  addCartItem,
+  cartQueryKey,
+  type CartScope,
+  type CartSelection,
+} from '@/features/cart/cart-api'
+import { updateCartCache, useCartScope } from '@/features/cart/cart-session'
 import type { CatalogSearch } from './catalog-search'
 
 type EditionPickerProps = {
   nftId: string
+  scope: CartScope | undefined
   editions: NftEdition[]
   search: CatalogSearch
 }
 
-function EditionPicker({ nftId, editions, search }: EditionPickerProps) {
+function EditionPicker({ nftId, editions, search, scope }: EditionPickerProps) {
   const [editionId, setEditionId] = useState(
     () => editions.find((edition) => edition.availableQuantity > 0)?.id ?? '',
   )
@@ -30,12 +37,16 @@ function EditionPicker({ nftId, editions, search }: EditionPickerProps) {
   const navigate = useNavigate({ from: '/nfts/$nftId' })
 
   const addItem = useMutation({
-    mutationFn: addCartItem,
+    mutationKey: scope === undefined ? undefined : cartQueryKey(scope),
+    mutationFn: (selection: CartSelection) => {
+      if (scope === undefined)
+        throw new Error('A sessão ainda está sendo verificada')
+      return addCartItem(scope, selection)
+    },
     retry: false,
-    scope: { id: 'guest-cart' },
+    scope: { id: scope ?? 'guest' },
     onSuccess: async (cart) => {
-      await queryClient.cancelQueries({ queryKey: guestCartQueryKey })
-      queryClient.setQueryData(guestCartQueryKey, cart)
+      if (scope !== undefined) await updateCartCache(queryClient, scope, cart)
     },
   })
 
@@ -94,7 +105,12 @@ function EditionPicker({ nftId, editions, search }: EditionPickerProps) {
 
         <Button
           type="button"
-          disabled={!edition || selectedQuantity === 0 || addItem.isPending}
+          disabled={
+            scope === undefined ||
+            !edition ||
+            selectedQuantity === 0 ||
+            addItem.isPending
+          }
           onClick={() =>
             addItem.mutate(
               { nftId, editionId, quantity: selectedQuantity },
@@ -129,6 +145,7 @@ export default function NftDetailPage() {
     retry: false,
   })
 
+  const scope = useCartScope()
   const nft = detail.data
 
   return (
@@ -166,7 +183,8 @@ export default function NftDetailPage() {
           </section>
 
           <EditionPicker
-            key={nft.id}
+            key={`${nft.id}:${scope}`}
+            scope={scope}
             nftId={nft.id}
             editions={nft.editions}
             search={search}

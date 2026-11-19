@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button'
 import {
   applyCartCoupon,
   getCart,
-  guestCartQueryKey,
+  cartQueryKey,
+  type CartScope,
   removeCartCoupon,
   removeCartItem,
   updateCartItemQuantity,
 } from './cart-api'
+import { updateCartCache, useCartScope } from './cart-session'
 
 type CartChange =
   | { kind: 'quantity'; itemId: string; quantity: number }
@@ -20,38 +22,53 @@ type CartChange =
   | { kind: 'remove-coupon' }
 
 export default function CartPage() {
+  const scope = useCartScope()
+
+  if (scope === undefined) {
+    return (
+      <main className="mx-auto grid max-w-5xl gap-6 p-6">
+        <h1 className="text-2xl font-semibold">Carrinho</h1>
+        <p role="status">Aguardando a verificação da sessão…</p>
+      </main>
+    )
+  }
+
+  return <ScopedCart key={scope} scope={scope} />
+}
+
+function ScopedCart({ scope }: { scope: CartScope }) {
   const search = useSearch({ from: '/carrinho' })
   const [couponDraft, setCouponDraft] = useState('')
 
+  const queryKey = cartQueryKey(scope)
   const cart = useQuery({
-    queryKey: guestCartQueryKey,
-    queryFn: ({ signal }) => getCart(signal),
+    queryKey,
+    queryFn: ({ signal }) => getCart(scope, signal),
     retry: false,
   })
 
   const queryClient = useQueryClient()
 
   const editCart = useMutation({
-    scope: { id: 'guest-cart' },
+    mutationKey: queryKey,
+    scope: { id: scope },
     retry: false,
     mutationFn: (change: CartChange) => {
       switch (change.kind) {
         case 'quantity':
-          return updateCartItemQuantity(change.itemId, change.quantity)
+          return updateCartItemQuantity(scope, change.itemId, change.quantity)
         case 'remove':
-          return removeCartItem(change.itemId)
+          return removeCartItem(scope, change.itemId)
         case 'apply-coupon':
-          return applyCartCoupon(change.code)
+          return applyCartCoupon(scope, change.code)
         case 'remove-coupon':
-          return removeCartCoupon()
+          return removeCartCoupon(scope)
       }
     },
-    onSuccess: async (updatedCart) => {
-      await queryClient.cancelQueries({ queryKey: guestCartQueryKey })
-      queryClient.setQueryData(guestCartQueryKey, updatedCart)
-    },
+    onSuccess: (updatedCart) =>
+      updateCartCache(queryClient, scope, updatedCart),
     onError: async () => {
-      await queryClient.invalidateQueries({ queryKey: guestCartQueryKey })
+      await queryClient.invalidateQueries({ queryKey })
     },
   })
 

@@ -6,6 +6,8 @@ import type {
   Session,
 } from '@/features/auth/auth-api'
 import { users } from './fixtures/users'
+import { cartScopeForUser } from '@/features/cart/cart-api'
+import { cartStorageLock, mergeGuestCart } from './cart-store'
 
 const storageKey = 'kurio:mock-session:v1'
 const sessionDurationMs = 30 * 60 * 1000
@@ -69,6 +71,16 @@ function readSession(): StoredSession | null {
   }
 }
 
+export function getMockCartScope() {
+  const stored = readSession()
+  const user =
+    stored && stored.expiresAt > Date.now()
+      ? listUsers().find((candidate) => candidate.id === stored.userId)
+      : undefined
+
+  return cartScopeForUser(user?.id)
+}
+
 async function derivePasswordVerifier(
   password: string,
   encodedSalt: string,
@@ -128,14 +140,26 @@ export const authHandlers = [
       return HttpResponse.json({ code: 'INVALID_CREDENTIALS' }, { status: 401 })
     }
 
-    const expiresAt = Date.now() + sessionDurationMs
+    return navigator.locks.request(cartStorageLock, () => {
+      const expiresAt = Date.now() + sessionDurationMs
+      const previous = localStorage.getItem(storageKey)
 
-    localStorage.setItem(
-      storageKey,
-      JSON.stringify({ userId: user.id, expiresAt }),
-    )
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ userId: user.id, expiresAt }),
+      )
 
-    return HttpResponse.json({ session: toSession(user, expiresAt) })
+      try {
+        mergeGuestCart(cartScopeForUser(user.id))
+      } catch {
+        if (previous === null) localStorage.removeItem(storageKey)
+        else localStorage.setItem(storageKey, previous)
+
+        return HttpResponse.json({ code: 'CART_MERGE_FAILED' }, { status: 503 })
+      }
+
+      return HttpResponse.json({ session: toSession(user, expiresAt) })
+    })
   }),
 
   http.get('/api/auth/session', async () => {
@@ -158,9 +182,10 @@ export const authHandlers = [
   http.delete('/api/auth/session', async () => {
     await delay(150)
 
-    localStorage.removeItem(storageKey)
-
-    return new HttpResponse(null, { status: 204 })
+    return navigator.locks.request(cartStorageLock, () => {
+      localStorage.removeItem(storageKey)
+      return new HttpResponse(null, { status: 204 })
+    })
   }),
 
   http.post('/api/auth/register', async ({ request }) => {

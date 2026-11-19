@@ -135,3 +135,117 @@ test('rejects invalid and expired coupons without changing the active quote', as
   await expect(appliedCoupon).toBeVisible()
   await expect(discountedTotal).toBeVisible()
 })
+
+test('merges the guest cart once and keeps each account cart isolated', async ({
+  page,
+}) => {
+  const summary = page.getByRole('complementary', {
+    name: 'Resumo da carteira',
+  })
+  const nft = page.getByRole('heading', { name: 'Emerald Ape #042' })
+  const emptyCart = page.getByText('Seu carrinho está vazio.')
+  const signOut = page.getByRole('button', { name: 'Sair', exact: true })
+
+  async function buyEdition() {
+    await page.goto('/nfts/0042')
+    await page.getByRole('button', { name: 'Comprar', exact: true }).click()
+    await expect(nft).toBeVisible()
+  }
+
+  async function signIn(email: string, password: string, displayName: string) {
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Entrar' })
+    await dialog.getByLabel('E-mail').fill(email)
+    await dialog.getByLabel('Senha').fill(password)
+    await dialog.getByRole('button', { name: 'Entrar', exact: true }).click()
+    await expect(page.getByText(displayName, { exact: true })).toBeVisible()
+  }
+
+  await buyEdition()
+  await summary.getByLabel('Código promocional').fill('KURIO10')
+  await summary.getByRole('button', { name: 'Aplicar', exact: true }).click()
+  await expect(summary.getByText('Cupom aplicado: KURIO10')).toBeVisible()
+
+  await signIn('ana@kurio.example.test', 'Kurio-Ana!2026', 'Ana Demo')
+  await expect(summary.getByText('1,087 ETH', { exact: true })).toBeVisible()
+  await signOut.click()
+  await expect(emptyCart).toBeVisible()
+
+  await signIn('bruno@kurio.example.test', 'Kurio-Bruno!2026', 'Bruno Demo')
+  await expect(emptyCart).toBeVisible()
+  await expect(nft).toBeHidden()
+  await buyEdition()
+  await expect(summary.getByText('1,206 ETH', { exact: true })).toBeVisible()
+  await signOut.click()
+  await expect(
+    page.getByRole('button', { name: 'Entrar', exact: true }),
+  ).toBeVisible()
+
+  await buyEdition()
+  await signIn('ana@kurio.example.test', 'Kurio-Ana!2026', 'Ana Demo')
+  await expect(summary.getByText('2,158 ETH', { exact: true })).toBeVisible()
+
+  await page.reload()
+  await expect(summary.getByText('2,158 ETH', { exact: true })).toBeVisible()
+  await signOut.click()
+  await expect(emptyCart).toBeVisible()
+
+  await signIn('ana@kurio.example.test', 'Kurio-Ana!2026', 'Ana Demo')
+  await expect(summary.getByText('2,158 ETH', { exact: true })).toBeVisible()
+  await signOut.click()
+  await expect(emptyCart).toBeVisible()
+  await signIn('bruno@kurio.example.test', 'Kurio-Bruno!2026', 'Bruno Demo')
+  await expect(summary.getByText('1,206 ETH', { exact: true })).toBeVisible()
+})
+
+test('keeps quantities visible when merging exceeds the available stock', async ({
+  page,
+}) => {
+  // Restore the legacy visitor cart to cover existing demo data.
+  await page.addInitScript(() => {
+    if (localStorage.getItem('kurio:carts:v1') === null) {
+      localStorage.setItem(
+        'kurio:guest-cart:v1',
+        JSON.stringify([
+          { nftId: '0042', editionId: 'limited-10', quantity: 2 },
+        ]),
+      )
+    }
+  })
+
+  await page.goto('/carrinho')
+  const summary = page.getByRole('complementary', {
+    name: 'Resumo da carteira',
+  })
+  await expect(summary.getByText('2,38 ETH', { exact: true })).toBeVisible()
+
+  async function signInAsAna() {
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: 'Entrar' })
+    await dialog.getByLabel('E-mail').fill('ana@kurio.example.test')
+    await dialog.getByLabel('Senha').fill('Kurio-Ana!2026')
+    await dialog.getByRole('button', { name: 'Entrar', exact: true }).click()
+    await expect(page.getByText('Ana Demo', { exact: true })).toBeVisible()
+  }
+
+  await signInAsAna()
+  await expect(summary.getByText('2,38 ETH', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Sair', exact: true }).click()
+  await expect(page.getByText('Seu carrinho está vazio.')).toBeVisible()
+
+  await page.goto('/nfts/0042')
+  await page.getByRole('button', { name: 'Comprar', exact: true }).click()
+  await expect(summary.getByText('1,19 ETH', { exact: true })).toBeVisible()
+
+  await signInAsAna()
+  await expect(page.getByRole('alert')).toContainText(
+    'O estoque de um ou mais NFTs mudou.',
+  )
+  await expect(page.getByLabel(/^Quantidade de Emerald Ape/)).toHaveText('3')
+
+  await page
+    .getByRole('button', { name: /^Diminuir quantidade de Emerald Ape/ })
+    .click()
+  await expect(page.getByLabel(/^Quantidade de Emerald Ape/)).toHaveText('2')
+  await expect(page.getByRole('alert')).toBeHidden()
+})

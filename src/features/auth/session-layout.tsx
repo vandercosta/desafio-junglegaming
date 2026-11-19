@@ -7,10 +7,10 @@ import {
 } from '@tanstack/react-router'
 import axios from 'axios'
 import { Dialog, Tabs } from 'radix-ui'
-import { useRef, type SubmitEvent, useState } from 'react'
+import { useEffect, useRef, type SubmitEvent, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
-  getSession,
+  sessionQueryOptions,
   sessionQueryKey,
   signIn,
   signOut,
@@ -20,6 +20,8 @@ import {
   type SessionState,
 } from './auth-api'
 import RegisterForm from './register-form'
+import { cartQueriesKey } from '@/features/cart/cart-api'
+import { getCartScope } from '@/features/cart/cart-session'
 
 export default function SessionLayout() {
   const authMode = useLocation({
@@ -33,13 +35,35 @@ export default function SessionLayout() {
   const brandRef = useRef<HTMLParagraphElement>(null)
   const entryRef = useRef<HTMLButtonElement>(null)
 
-  const sessionQuery = useQuery({
-    queryKey: sessionQueryKey,
-    queryFn: ({ signal }) => getSession(signal),
-    retry: false,
-  })
+  const sessionQuery = useQuery(sessionQueryOptions)
+  const session = sessionQuery.data?.session
+  const user = session?.user
+  const cartScope = getCartScope(sessionQuery.data)
 
-  const user = sessionQuery.data?.session?.user
+  useEffect(() => {
+    queryClient.removeQueries({
+      queryKey: cartQueriesKey,
+      predicate: (query) => query.queryKey[1] !== cartScope,
+    })
+
+    const mutations = queryClient.getMutationCache()
+    for (const mutation of mutations.findAll({ mutationKey: cartQueriesKey })) {
+      if (mutation.options.mutationKey?.[1] !== cartScope) {
+        mutations.remove(mutation)
+      }
+    }
+  }, [cartScope, queryClient])
+
+  useEffect(() => {
+    if (!session) return
+
+    const timeout = window.setTimeout(
+      () => void queryClient.invalidateQueries({ queryKey: sessionQueryKey }),
+      Math.max(0, Date.parse(session.expiresAt) - Date.now()),
+    )
+
+    return () => window.clearTimeout(timeout)
+  }, [session, queryClient])
 
   function setAuthMode(
     mode: 'entrar' | 'cadastrar' | undefined,
