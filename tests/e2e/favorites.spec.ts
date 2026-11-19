@@ -43,6 +43,9 @@ test('preserves the current NFT at login and keeps favorites isolated by account
   await page.getByRole('link', { name: 'Lista de interesse' }).click()
   const item = page.getByRole('link', { name: 'Emerald Ape #042' })
   await expect(item).toBeVisible()
+  await item.scrollIntoViewIfNeeded()
+  await expect(item.locator('img')).toHaveJSProperty('naturalWidth', 250)
+  await expect(item).toHaveAttribute('href', '/nfts/0042')
 
   await signOutFromHeader(page)
   const enter = page.getByRole('link', { name: 'Entrar para ver favoritos' })

@@ -88,7 +88,10 @@ async function openCart(page: Page, quantity = 1) {
   }
   await page.getByRole('button', { name: 'Comprar', exact: true }).click()
   await expect(page).toHaveURL(/\/carrinho$/)
-  await expect(connectionStatus(page)).toHaveText('Tempo real conectado.')
+  await expect
+    .poll(async () => (await readFrames(page, 'realtime.subscribed')).length)
+    .toBeGreaterThan(0)
+  await expect(connectionStatus(page)).toBeHidden()
 }
 
 async function seedWallet(page: Page) {
@@ -326,7 +329,6 @@ test('reconciles the same pending order from REST after a Socket.IO reconnect', 
       response.ok() &&
       (await response.json()).status === 'confirmed',
   )
-  await expect(connectionStatus(page)).toHaveText('Tempo real conectado.')
   await expect
     .poll(
       async () =>
@@ -335,6 +337,7 @@ test('reconciles the same pending order from REST after a Socket.IO reconnect', 
         ).length,
     )
     .toBeGreaterThan(initialPrivateSubscriptions)
+  await expect(connectionStatus(page)).toBeHidden()
   expect(await (await restoredOrder).json()).toMatchObject({
     id: order.id,
     status: 'confirmed',

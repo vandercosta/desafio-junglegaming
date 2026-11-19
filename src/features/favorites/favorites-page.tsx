@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { sessionQueryOptions } from '@/features/auth/auth-api'
 import { Button } from '@/components/ui/button'
+import { formatEth } from '@/lib/eth'
 import FavoriteButton from './favorite-button'
 import { useFavorites } from './use-favorites'
 
@@ -52,17 +53,24 @@ function AccountFavorites({ userId }: { userId: string }) {
       {favorites.data && favorites.data.items.length > 0 && (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {favorites.data.items.map((nft) => (
-            <li key={nft.id} className="grid gap-2 rounded-md border p-4">
-              <h2>
-                <Link
-                  to="/nfts/$nftId"
-                  params={{ nftId: nft.id }}
-                  className="underline"
-                >
-                  {nft.name}
-                </Link>
-              </h2>
-              <p>{nft.priceEth.replace('.', ',')} ETH</p>
+            <li
+              key={nft.id}
+              className="grid content-start gap-2 rounded-md border p-4"
+            >
+              <Link
+                to="/nfts/$nftId"
+                params={{ nftId: nft.id }}
+                className="group grid gap-3 rounded-md focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                <img
+                  src={nft.imageUrl}
+                  alt=""
+                  loading="lazy"
+                  className="aspect-square w-full rounded-md bg-surface-card object-cover"
+                />
+                <h2 className="group-hover:underline">{nft.name}</h2>
+              </Link>
+              <p>{formatEth(nft.priceEth)}</p>
               <FavoriteButton nft={nft} />
             </li>
           ))}

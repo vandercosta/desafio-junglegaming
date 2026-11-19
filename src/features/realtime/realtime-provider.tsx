@@ -24,12 +24,6 @@ type ScopedState = {
   lastNftUpdate: NftUpdatedEvent | null
 }
 
-const connectionLabels: Record<RealtimeStatus, string> = {
-  connecting: 'Conectando ao tempo real…',
-  online: 'Tempo real conectado.',
-  offline: 'Tempo real desconectado. Tentando reconectar…',
-}
-
 function validVersion(version: number) {
   return Number.isSafeInteger(version) && version > 0
 }
@@ -281,13 +275,13 @@ export default function RealtimeProvider({
 
   return (
     <RealtimeContext.Provider value={current}>
-      {userId !== undefined && (
+      {userId !== undefined && current.status === 'offline' && (
         <p
           role="status"
           aria-label="Conexão em tempo real"
           className="page-shell text-xs text-muted-foreground"
         >
-          {connectionLabels[current.status]}
+          Tempo real desconectado. Tentando reconectar…
         </p>
       )}
       {children}
