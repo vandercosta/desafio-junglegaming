@@ -12,6 +12,7 @@ import {
 import CatalogFilters from '@/features/catalog/catalog-filters'
 import {
   catalogFiltersHash,
+  catalogOptions,
   catalogViews,
   parseCatalogSearch,
   type CatalogSearch,
@@ -73,18 +74,21 @@ export default function App() {
             <CatalogFilters
               search={search}
               onApply={applyFilters}
+              showSort={false}
               searchInputId="catalog-search"
             />
           </div>
         )}
 
-        <div
-          role="group"
-          aria-label="Visualização do catálogo"
-          className="mb-4 flex flex-wrap gap-x-3 gap-y-1 lg:gap-x-7"
-        >
-          {(Object.keys(catalogViews) as Array<keyof typeof catalogViews>).map(
-            (view) => (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <div
+            role="group"
+            aria-label="Visualização do catálogo"
+            className="flex flex-wrap gap-x-3 gap-y-1 lg:gap-x-7"
+          >
+            {(
+              Object.keys(catalogViews) as Array<keyof typeof catalogViews>
+            ).map((view) => (
               <button
                 key={view}
                 type="button"
@@ -105,8 +109,29 @@ export default function App() {
               >
                 {catalogViews[view]}
               </button>
-            ),
-          )}
+            ))}
+          </div>
+          <label className="ml-auto hidden items-center gap-2 text-sm lg:flex">
+            Ordenar por
+            <select
+              value={search.sort ?? ''}
+              onChange={(event) =>
+                applyFilters({
+                  sort: parseCatalogSearch({ sort: event.currentTarget.value })
+                    .sort,
+                  page: undefined,
+                })
+              }
+              className="rounded-md border border-input bg-background px-2 py-2 focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              <option value="">Listados recentemente</option>
+              {Object.entries(catalogOptions.sort).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {catalog.isPending && <p role="status">Carregando NFTs…</p>}

@@ -18,6 +18,7 @@ type Props = {
   search: CatalogSearch
   onApply: (search: CatalogSearch) => void
   showSearch?: boolean
+  showSort?: boolean
   searchInputId?: string
 }
 
@@ -28,6 +29,7 @@ export default function CatalogFilters({
   search,
   onApply,
   showSearch = true,
+  showSort = true,
   searchInputId,
 }: Props) {
   function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
@@ -37,6 +39,7 @@ export default function CatalogFilters({
       parseCatalogSearch({
         q: search.q,
         view: search.view,
+        sort: search.sort,
         ...Object.fromEntries(fields),
       }),
     )
@@ -58,24 +61,26 @@ export default function CatalogFilters({
         </label>
       )}
 
-      {selects.map(({ name, label, empty }) => (
-        <label key={name} className="grid gap-1">
-          {label}
-          <select
-            key={search[name] ?? ''}
-            name={name}
-            defaultValue={search[name] ?? ''}
-            className={fieldClassName}
-          >
-            <option value="">{empty}</option>
-            {Object.entries(catalogOptions[name]).map(([value, text]) => (
-              <option key={value} value={value}>
-                {text}
-              </option>
-            ))}
-          </select>
-        </label>
-      ))}
+      {selects
+        .filter(({ name }) => showSort || name !== 'sort')
+        .map(({ name, label, empty }) => (
+          <label key={name} className="grid gap-1">
+            {label}
+            <select
+              key={search[name] ?? ''}
+              name={name}
+              defaultValue={search[name] ?? ''}
+              className={fieldClassName}
+            >
+              <option value="">{empty}</option>
+              {Object.entries(catalogOptions[name]).map(([value, text]) => (
+                <option key={value} value={value}>
+                  {text}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
 
       {prices.map(({ name, label }) => (
         <label key={name} className="grid gap-1">

@@ -1,5 +1,36 @@
 import { expect, test } from '@playwright/test'
 
+test('sorts from the toolbar on desktop and the filter panel on mobile', async ({
+  page,
+  isMobile,
+}) => {
+  await page.goto('/?view=new&page=2')
+  const sort = page.getByRole('combobox', { name: 'Ordenar por' })
+
+  if (isMobile) {
+    await expect(sort).toBeHidden()
+    await page.getByRole('button', { name: 'Abrir filtros' }).click()
+    await sort.selectOption('price-desc')
+    await page.getByRole('button', { name: 'Aplicar' }).click()
+  } else {
+    await sort.selectOption('price-desc')
+  }
+
+  await expect(page).toHaveURL(
+    (url) =>
+      url.searchParams.get('view') === 'new' &&
+      url.searchParams.get('sort') === 'price-desc' &&
+      !url.searchParams.has('page'),
+  )
+
+  if (!isMobile) {
+    await page.getByRole('link', { name: 'Buscar NFTs' }).click()
+    await expect(sort).toHaveCount(1)
+    await page.getByRole('button', { name: 'Aplicar' }).click()
+    await expect(sort).toHaveValue('price-desc')
+  }
+})
+
 test('filters catalog views and preserves other filters in the URL', async ({
   page,
 }) => {
