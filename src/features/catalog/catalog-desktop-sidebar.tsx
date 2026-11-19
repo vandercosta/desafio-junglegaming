@@ -150,7 +150,7 @@ function FilterChoices<Name extends 'collection' | 'network'>({
             <button
               type="button"
               aria-pressed={selected === value}
-              className="flex min-h-10 w-full items-center justify-between gap-3 rounded-sm px-2 text-left text-sm text-muted-foreground hover:text-text-accent focus-visible:outline-2 focus-visible:outline-ring aria-pressed:font-semibold aria-pressed:text-text-accent"
+              className="flex min-h-10 w-full cursor-pointer items-center justify-between gap-3 rounded-sm px-2 text-left text-sm text-muted-foreground hover:text-text-accent focus-visible:outline-2 focus-visible:outline-ring aria-pressed:font-semibold aria-pressed:text-text-accent"
               onClick={() =>
                 onApply({ [name]: selected === value ? undefined : value })
               }

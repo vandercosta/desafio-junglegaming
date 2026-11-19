@@ -66,6 +66,10 @@ test('combines desktop sidebar filters and applies a keyboard-selected price ran
 
   await page.getByRole('button', { name: 'Próxima' }).click()
   await expect(page).toHaveURL((url) => url.searchParams.get('page') === '2')
+  await expect(page.getByRole('button', { name: 'Página 2' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
 
   await sidebar
     .getByRole('slider', { name: 'Preço mínimo em ETH' })

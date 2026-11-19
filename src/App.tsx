@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { ChevronRight } from 'lucide-react'
 import HomeCarousel from '@/components/home-carousel'
 import { Button } from '@/components/ui/button'
 import { listNfts } from '@/features/catalog/catalog-api'
@@ -188,7 +189,7 @@ export default function App() {
             {pageCount > 0 && (
               <nav
                 aria-label="Paginação do catálogo"
-                className="mt-4 flex items-center gap-3"
+                className="mt-8 flex flex-wrap items-center justify-end gap-2 lg:mt-12"
               >
                 {page > pageCount ? (
                   <Button type="button" onClick={() => goToPage(1)}>
@@ -196,22 +197,40 @@ export default function App() {
                   </Button>
                 ) : (
                   <>
+                    {Array.from({ length: pageCount }, (_, index) => {
+                      const pageNumber = index + 1
+
+                      return (
+                        <Button
+                          key={pageNumber}
+                          type="button"
+                          variant={pageNumber === page ? 'default' : 'outline'}
+                          aria-label={`Página ${pageNumber}`}
+                          aria-current={
+                            pageNumber === page ? 'page' : undefined
+                          }
+                          onClick={() =>
+                            pageNumber !== page && goToPage(pageNumber)
+                          }
+                          className={
+                            pageNumber === page
+                              ? 'size-9 border-primary text-base'
+                              : 'size-9 text-base dark:border-border dark:bg-transparent'
+                          }
+                        >
+                          {pageNumber}
+                        </Button>
+                      )
+                    })}
                     <Button
                       type="button"
-                      disabled={page === 1}
-                      onClick={() => goToPage(page - 1)}
-                    >
-                      Anterior
-                    </Button>
-                    <p>
-                      Página {page} de {pageCount}
-                    </p>
-                    <Button
-                      type="button"
+                      variant="outline"
+                      aria-label="Próxima"
                       disabled={page === pageCount}
                       onClick={() => goToPage(page + 1)}
+                      className="size-9 dark:border-border dark:bg-transparent"
                     >
-                      Próxima
+                      <ChevronRight aria-hidden="true" />
                     </Button>
                   </>
                 )}
