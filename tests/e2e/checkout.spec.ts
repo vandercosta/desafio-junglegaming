@@ -174,7 +174,15 @@ test('finishes a guest purchase after sign-in and restores the confirmed receipt
   await expect(
     page.getByRole('heading', { name: 'Pedido confirmado' }),
   ).toBeVisible()
-  await expect(page.getByText('Emerald Ape #042')).toBeVisible()
+  const receipt = page.getByRole('region', { name: /Pedido confirmado/ })
+  const items = receipt.getByRole('table', { name: 'Detalhes da transação' })
+  const item = items.getByRole('row', { name: /Emerald Ape #042/ })
+  await expect(item.getByRole('rowheader')).toContainText('#0042')
+  await expect(item.locator('img')).toHaveJSProperty('naturalWidth', 250)
+  await expect(item.getByRole('cell', { name: '(x 1)' })).toBeVisible()
+  await expect(
+    receipt.getByRole('link', { name: 'Fechar comprovante' }),
+  ).toHaveAttribute('href', '/carrinho')
   await expect(page.getByRole('main')).toContainText('1,206 ETH')
   expect(submissions).toEqual([expect.any(String)])
 
