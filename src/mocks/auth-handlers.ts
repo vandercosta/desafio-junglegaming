@@ -5,7 +5,14 @@ import type {
   RegisterInput,
   Session,
 } from '@/features/auth/auth-api'
-import { users } from './fixtures/users'
+import {
+  createPasswordVerifier,
+  derivePasswordVerifier,
+  listUsers,
+  saveUser,
+  userStorageKey,
+  type MockUser,
+} from './user-store'
 import { cartScopeForUser } from '@/features/cart/cart-api'
 import { cartStorageLock, mergeGuestCart } from './cart-store'
 
@@ -15,43 +22,6 @@ const sessionDurationMs = 30 * 60 * 1000
 type StoredSession = {
   userId: string
   expiresAt: number
-}
-
-const registeredUsersKey = 'kurio:mock-users:v1'
-
-type MockUser = (typeof users)[number]
-
-const userFields = [
-  'id',
-  'username',
-  'displayName',
-  'email',
-  'salt',
-  'verifier',
-] as const
-
-function isMockUser(value: unknown): value is MockUser {
-  if (typeof value !== 'object' || value === null) return false
-
-  const user = value as Partial<MockUser>
-
-  return userFields.every((field) => typeof user[field] === 'string')
-}
-
-function readRegisteredUsers(): MockUser[] {
-  try {
-    const data: unknown = JSON.parse(
-      localStorage.getItem(registeredUsersKey) ?? '[]',
-    )
-
-    return Array.isArray(data) ? data.filter(isMockUser) : []
-  } catch {
-    return []
-  }
-}
-
-function listUsers(): MockUser[] {
-  return [...users, ...readRegisteredUsers()]
 }
 
 function readSession(): StoredSession | null {
@@ -85,31 +55,8 @@ export function getMockCartScope() {
   return cartScopeForUser(getMockUserId())
 }
 
-async function derivePasswordVerifier(
-  password: string,
-  encodedSalt: string,
-): Promise<string> {
-  const salt = Uint8Array.from(atob(encodedSalt), (char) => char.charCodeAt(0))
-
-  const key = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits'],
-  )
-
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 600_000 },
-    key,
-    256,
-  )
-
-  return btoa(String.fromCharCode(...new Uint8Array(bits)))
-}
-
 function toSession(
-  { id, displayName, email }: (typeof users)[number],
+  { id, displayName, email }: MockUser,
   expiresAt: number,
 ): Session {
   return {
@@ -145,6 +92,21 @@ export const authHandlers = [
     }
 
     return navigator.locks.request(cartStorageLock, () => {
+      const currentUser = listUsers().find(
+        (candidate) => candidate.id === user.id,
+      )
+      if (
+        !currentUser ||
+        currentUser.email !== email ||
+        currentUser.salt !== user.salt ||
+        currentUser.verifier !== user.verifier
+      ) {
+        return HttpResponse.json(
+          { code: 'INVALID_CREDENTIALS' },
+          { status: 401 },
+        )
+      }
+
       const expiresAt = Date.now() + sessionDurationMs
       const previous = localStorage.getItem(storageKey)
 
@@ -162,7 +124,7 @@ export const authHandlers = [
         return HttpResponse.json({ code: 'CART_MERGE_FAILED' }, { status: 503 })
       }
 
-      return HttpResponse.json({ session: toSession(user, expiresAt) })
+      return HttpResponse.json({ session: toSession(currentUser, expiresAt) })
     })
   }),
 
@@ -228,13 +190,10 @@ export const authHandlers = [
       )
     }
 
-    const saltBytes = crypto.getRandomValues(new Uint8Array(16))
-    const salt = btoa(String.fromCharCode(...saltBytes))
-    const verifier = await derivePasswordVerifier(password, salt)
+    const credentials = await createPasswordVerifier(password)
 
-    return navigator.locks.request(registeredUsersKey, () => {
-      const registeredUsers = readRegisteredUsers()
-      const existingUsers = [...users, ...registeredUsers]
+    return navigator.locks.request(userStorageKey, () => {
+      const existingUsers = listUsers()
       const conflicts: RegisterErrors = {}
 
       if (existingUsers.some((user) => user.email === email)) {
@@ -257,14 +216,10 @@ export const authHandlers = [
         username,
         displayName: username,
         email,
-        salt,
-        verifier,
+        ...credentials,
       }
 
-      localStorage.setItem(
-        registeredUsersKey,
-        JSON.stringify([...registeredUsers, user]),
-      )
+      saveUser(user)
 
       return HttpResponse.json({ email }, { status: 201 })
     })

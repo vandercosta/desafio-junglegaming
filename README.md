@@ -15,9 +15,10 @@ Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Ku
 - Login e logout simulados, com recuperação da sessão após atualizar a página e aviso de expiração. O diálogo de login preserva a rota e os filtros atuais.
 - Cadastro de colecionadores com validação por campo, tratamento de conflitos e persistência das contas de demonstração.
 - Favoritos no catálogo e no detalhe, com lista de interesse persistida por conta e retorno ao estado anterior em caso de falha.
+- Perfil do colecionador com edição de dados, avatar e alteração de senha.
 - Estados de carregamento, lista vazia, erro e recurso inexistente.
 
-Perfil, carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
+Carteiras, checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
 
 ## Tecnologias
 
@@ -118,6 +119,15 @@ localStorage.setItem('kurio:mock-favorites-fail-next:v1', 'true')
 
 Clique em **Favoritar**. O próximo pedido de inclusão ou remoção válido recebe HTTP `503`. A interface volta ao estado anterior e mostra uma mensagem de erro. Clique novamente para concluir a operação.
 
+## Perfil do colecionador
+
+Entre com uma conta de demonstração e selecione **Meu perfil** no cabeçalho ou abra `/perfil`. Você pode alterar nome de exibição, nome de usuário, e-mail, nome ENS e apelido da carteira. Digite apenas o nome ENS no campo. O sufixo `.eth` aparece ao lado.
+
+- O avatar aceita PNG, JPEG ou WebP de até 512 KiB. Escolher ou remover a imagem altera a prévia. **Salvar perfil** confirma as mudanças junto com os demais campos.
+- Para reproduzir um conflito, entre com Ana, preencha os campos obrigatórios e tente salvar o e-mail de Bruno. O formulário mostra o erro no campo.
+- Em **Alterar senha**, informe a senha atual e confirme a nova senha. Para testar a rejeição, use uma senha atual incorreta e mantenha os demais campos válidos. Após salvar, a sessão atual continua ativa. Use o e-mail e a senha atualizados no próximo login.
+- O reset abaixo restaura as credenciais e os dados originais das contas de demonstração.
+
 ## Cenários da API simulada
 
 | Variável               | Valor   | Comportamento                                             |
@@ -167,7 +177,7 @@ VITE_MOCK_CART_EDITS=error npm run dev:mocks
 
 Para restaurar as respostas padrão, reinicie o servidor com `npm run dev:mocks`, sem as variáveis de cenário.
 
-O mock guarda a sessão, as contas cadastradas, os favoritos, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Execute o trecho abaixo no console do navegador para limpar esses dados e voltar às contas de demonstração originais.
+O mock guarda a sessão, as contas cadastradas, as alterações de perfil e senha, os favoritos, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Execute o trecho abaixo no console do navegador para limpar esses dados e voltar às contas de demonstração originais.
 
 ```js
 localStorage.removeItem('kurio:guest-cart:v1')
@@ -198,6 +208,9 @@ O servidor de desenvolvimento e o preview usam portas diferentes. Limpe as chave
 | `GET`    | `/api/favorites`          | Retorna `{ items }` com os NFTs salvos pela conta autenticada.                                                                                                                                                                  |
 | `PUT`    | `/api/favorites/:nftId`   | Salva o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                  |
 | `DELETE` | `/api/favorites/:nftId`   | Remove o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                 |
+| `GET`    | `/api/profile`            | Retorna os dados e o avatar da conta autenticada.                                                                                                                                                                               |
+| `PUT`    | `/api/profile`            | Atualiza dados e avatar e retorna `{ profile, user }`. Conflitos de e-mail ou nome de usuário retornam HTTP `409`.                                                                                                              |
+| `PUT`    | `/api/profile/password`   | Recebe `{ currentPassword, newPassword }` e retorna HTTP `204`. Senha incorreta ou inválida retorna HTTP `422` com mensagens por campo.                                                                                         |
 | `POST`   | `/api/auth/login`         | Recebe `{ email, password }`, transfere o carrinho de visitante para a conta e retorna a sessão. Dados inválidos retornam HTTP `400` com `INVALID_INPUT`. Credenciais incorretas retornam HTTP `401` com `INVALID_CREDENTIALS`. |
 | `POST`   | `/api/auth/register`      | Recebe `{ username, email, password }` e retorna HTTP `201` com `{ email }`. Responde com `422 VALIDATION_ERROR` ou `409 ACCOUNT_CONFLICT`, ambos com mensagens em `fields`.                                                    |
 | `GET`    | `/api/auth/session`       | Retorna a sessão atual ou `{ session: null }`. Sessão expirada retorna HTTP `401` com `SESSION_EXPIRED`.                                                                                                                        |
@@ -206,6 +219,8 @@ O servidor de desenvolvimento e o preview usam portas diferentes. Limpe as chave
 O mock resolve o carrinho a partir da sessão. O cliente envia `X-Cart-Scope` para indicar o carrinho que espera encontrar. Se a sessão tiver mudado, a API retorna HTTP `409` com `CART_SCOPE_CHANGED`. A fusão grava o carrinho da conta e esvazia o carrinho de visitante na mesma atualização do armazenamento. O mock ainda lê dados da chave legada `kurio:guest-cart:v1` até a primeira gravação no formato novo.
 
 Os endpoints de favoritos exigem sessão válida. O mock usa a sessão para resolver a conta e confere o cabeçalho `X-Favorites-User` para recusar operações emitidas sob outra sessão. A API retorna HTTP `401` sem sessão, `409` quando a conta mudou e `404` em operações para um NFT inexistente.
+
+Os endpoints de perfil exigem sessão válida e usam `X-Profile-User` para recusar pedidos cujo usuário esperado difere da sessão. O mock persiste atualizações por ID e guarda apenas sal e verificador PBKDF2 para a senha.
 
 Cada linha do carrinho representa um par de NFT e edição. O mock persiste os IDs, as quantidades e o código aplicado e consulta as fixtures para montar os preços e o estoque. A cotação é recalculada quando a quantidade, os itens ou o cupom mudam. As quantidades são inteiras. Os valores em ETH trafegam como strings decimais, e os cálculos de preço usam `BigInt` em wei.
 
@@ -231,6 +246,8 @@ O TanStack Query usa os filtros validados como parte da chave da listagem, o ID 
 As mutações do carrinho atualizam o cache com a resposta da API. Se uma edição falhar, o carrinho é consultado novamente para reconciliar o estado exibido com o mock.
 
 Favoritos usam `['favorites', userId]`. O botão mostra a inclusão ou remoção enquanto a API responde. Uma falha devolve o botão ao estado confirmado. A resposta bem-sucedida atualiza a lista da conta ativa, e as consultas e mutations de favoritos da conta anterior são removidas do cache na troca de sessão.
+
+O perfil usa `['profile', userId]`. Ao salvar, o cache recebe o perfil confirmado e o nome e o e-mail são atualizados na sessão. Na troca de conta, o cache do perfil anterior é removido.
 
 A sessão usa a chave `['session']`. Na troca de carrinho, as queries e mutations em cache do carrinho anterior são removidas. Após login ou logout, as consultas de sessão pendentes são canceladas e o cache recebe o estado confirmado pela API.
 
@@ -262,6 +279,12 @@ Para verificar a persistência, a troca de conta e a recuperação de falha dos 
 
 ```bash
 npm run test:e2e -- favorites.spec.ts
+```
+
+Para verificar a edição do perfil, o avatar, a troca de conta e a alteração de senha, execute a suíte abaixo.
+
+```bash
+npm run test:e2e -- profile.spec.ts
 ```
 
 Abra o relatório HTML com:

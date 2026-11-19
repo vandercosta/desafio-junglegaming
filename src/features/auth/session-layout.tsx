@@ -24,6 +24,7 @@ import RegisterForm from './register-form'
 import { cartQueriesKey } from '@/features/cart/cart-api'
 import { getCartScope } from '@/features/cart/cart-session'
 import { favoritesQueriesKey } from '@/features/favorites/favorites-api'
+import { profileQueriesKey } from '@/features/profile/profile-api'
 
 export default function SessionLayout() {
   const authMode = useLocation({
@@ -62,6 +63,7 @@ export default function SessionLayout() {
 
     clearOtherAccounts(cartQueriesKey, cartScope)
     clearOtherAccounts(favoritesQueriesKey, user?.id)
+    clearOtherAccounts(profileQueriesKey, user?.id)
   }, [cartScope, queryClient, user?.id])
 
   useEffect(() => {
@@ -196,8 +198,11 @@ export default function SessionLayout() {
         )}
 
         {user ? (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <p>{user.displayName}</p>
+            <Link to="/perfil" className="underline">
+              Meu perfil
+            </Link>
             <Link to="/favoritos" className="underline">
               Lista de interesse
             </Link>
