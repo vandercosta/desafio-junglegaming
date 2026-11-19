@@ -107,6 +107,27 @@ export const handlers = [
 
     return HttpResponse.json<NftDetail>({
       ...nft,
+      relatedNfts: catalog.nfts.filter(
+        (item) => item.id !== nft.id && item.collection === nft.collection,
+      ),
+      reviews:
+        nft.id === '0042'
+          ? [
+              {
+                id: '1',
+                author: 'Ana Demo',
+                rating: 5,
+                comment:
+                  'A composição e os detalhes da obra são o destaque da coleção.',
+              },
+              {
+                id: '2',
+                author: 'Bruno Demo',
+                rating: 4,
+                comment: 'Gostei das cores e da expressão do personagem.',
+              },
+            ]
+          : [],
       description: `${nft.name} é um colecionável digital da Kurio, com arte desbloqueável e acesso para colecionadores.`,
       collectionName: 'Kurio Apes',
       attributes:

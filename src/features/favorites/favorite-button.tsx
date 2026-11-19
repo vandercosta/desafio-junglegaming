@@ -36,7 +36,8 @@ export default function FavoriteButton({ nft }: { nft: FavoriteNft }) {
   if (data === undefined) {
     return (
       <Button type="button" variant="outline-primary" disabled>
-        Favoritar
+        <Heart aria-hidden="true" />
+        <span data-favorite-label>Favoritar</span>
       </Button>
     )
   }
@@ -51,7 +52,7 @@ export default function FavoriteButton({ nft }: { nft: FavoriteNft }) {
         aria-label={`Entrar para favoritar ${nft.name}`}
       >
         <Heart aria-hidden="true" />
-        Favoritar
+        <span data-favorite-label>Favoritar</span>
       </Link>
     </Button>
   )
@@ -120,7 +121,7 @@ function AccountFavoriteButton({
         onClick={() => mutation.mutate(!confirmed)}
       >
         <Heart aria-hidden="true" fill={saved ? 'currentColor' : 'none'} />
-        Favoritar
+        <span data-favorite-label>Favoritar</span>
       </Button>
       {mutation.isError && (
         <p role="alert" className="text-sm text-destructive">

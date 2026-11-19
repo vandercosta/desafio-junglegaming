@@ -18,6 +18,8 @@ export type NftEdition = {
 }
 
 export type NftDetail = NftSummary & {
+  reviews?: { id: string; author: string; rating: number; comment: string }[]
+  relatedNfts?: NftSummary[]
   description: string
   collectionName: string
   attributes: string[]
