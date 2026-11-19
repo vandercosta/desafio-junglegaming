@@ -64,6 +64,7 @@ export function buildCart(
         ...selection,
         id: cartItemId(selection),
         nftName: nft.name,
+        imageUrl: nft.imageUrl,
         editionLabel: edition.label,
         unitPriceEth: nft.priceEth,
         lineTotalEth: fromWei(lineTotal),

@@ -12,6 +12,13 @@ test('adds an NFT edition to the guest cart and keeps it after reload', async ({
   const summary = page.getByRole('complementary', {
     name: 'Resumo da carteira',
   })
+  const row = page.locator('li').filter({
+    has: page.getByRole('heading', { name: 'Emerald Ape #042' }),
+  })
+  await expect(row.locator('img').first()).toHaveJSProperty('naturalWidth', 250)
+  await expect(
+    row.getByRole('button', { name: /^Remover Emerald Ape/ }),
+  ).toBeVisible()
   await expect(summary.getByText('2,38 ETH', { exact: true })).toBeVisible()
 
   await page.reload()

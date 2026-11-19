@@ -9,6 +9,7 @@ export type CartSelection = {
 export type CartItem = CartSelection & {
   id: string
   nftName: string
+  imageUrl?: string
   editionLabel: string
   unitPriceEth: string
   lineTotalEth: string
