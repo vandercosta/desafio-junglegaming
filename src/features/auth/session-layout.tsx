@@ -26,6 +26,7 @@ import { getCartScope } from '@/features/cart/cart-session'
 import { favoritesQueriesKey } from '@/features/favorites/favorites-api'
 import { profileQueriesKey } from '@/features/profile/profile-api'
 import { walletsQueriesKey } from '@/features/wallets/wallets-api'
+import { checkoutQueriesKey } from '@/features/checkout/checkout-api'
 
 export default function SessionLayout() {
   const authMode = useLocation({
@@ -66,6 +67,7 @@ export default function SessionLayout() {
     clearOtherAccounts(favoritesQueriesKey, user?.id)
     clearOtherAccounts(profileQueriesKey, user?.id)
     clearOtherAccounts(walletsQueriesKey, user?.id)
+    clearOtherAccounts(checkoutQueriesKey, user?.id)
   }, [cartScope, queryClient, user?.id])
 
   useEffect(() => {

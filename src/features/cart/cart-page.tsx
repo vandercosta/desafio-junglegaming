@@ -339,6 +339,15 @@ function ScopedCart({ scope }: { scope: CartScope }) {
                 </div>
               </dl>
             )}
+            <Button asChild className="mt-4 w-full">
+              <Link
+                to="/pagamento"
+                search={search}
+                disabled={editCart.isPending || cart.data.hasStockConflict}
+              >
+                Conectar e finalizar
+              </Link>
+            </Button>
           </aside>
         </div>
       )}

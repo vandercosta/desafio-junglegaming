@@ -1,7 +1,9 @@
 import type { CartScope, CartSelection } from '@/features/cart/cart-api'
+import type { Order } from '@/features/checkout/checkout-api'
 
 const cartsKey = 'kurio:carts:v1'
 const legacyGuestKey = 'kurio:guest-cart:v1'
+const checkoutField = '$checkout'
 
 export const cartStorageLock = cartsKey
 
@@ -11,6 +13,19 @@ export type CartState = {
 }
 
 type StoredCarts = Record<string, unknown>
+
+export type StoredOrder = {
+  order: Order
+  idempotencyKey: string
+  fingerprint: string
+  readyAt: number
+  outcome: 'confirmed' | 'refused'
+}
+
+export type CheckoutStore = {
+  orders: Record<string, StoredOrder[]>
+  prices: Record<string, string>
+}
 
 export function isCartSelection(value: unknown): value is CartSelection {
   if (typeof value !== 'object' || value === null) return false
@@ -69,6 +84,23 @@ export function writeCart(scope: CartScope, state: CartState): void {
     cartsKey,
     JSON.stringify({ ...readCarts(), [scope]: state }),
   )
+}
+
+export function readCheckoutStore(): CheckoutStore {
+  const checkout = readCarts()[checkoutField] as
+    Partial<CheckoutStore> | undefined
+
+  return { orders: checkout?.orders ?? {}, prices: checkout?.prices ?? {} }
+}
+
+export function writeCheckoutStore(
+  checkout: CheckoutStore,
+  purchase?: { scope: CartScope; cart: CartState },
+): void {
+  const carts = readCarts()
+  if (purchase) carts[purchase.scope] = purchase.cart
+  carts[checkoutField] = checkout
+  localStorage.setItem(cartsKey, JSON.stringify(carts))
 }
 
 export function mergeGuestCart(accountScope: CartScope): void {

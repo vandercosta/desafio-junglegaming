@@ -41,7 +41,7 @@ function cartRequest(scope: CartScope) {
   return { headers: { 'X-Cart-Scope': scope } }
 }
 
-function validateCart(data: CartResponse): CartResponse {
+export function validateCart(data: CartResponse): CartResponse {
   if (
     !Array.isArray(data?.items) ||
     typeof data.subtotalEth !== 'string' ||

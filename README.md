@@ -17,9 +17,10 @@ Aplicação frontend desenvolvida para o desafio técnico da Jungle Gaming. A Ku
 - Favoritos no catálogo e no detalhe, com lista de interesse persistida por conta e retorno ao estado anterior em caso de falha.
 - Perfil do colecionador com edição de dados, avatar e alteração de senha.
 - Cadastro e edição de carteiras principal e secundária, com validação por rede e persistência por conta.
+- Checkout simulado com revisão da cotação, conexão de carteira, pedidos recuperáveis e recibo de compras confirmadas.
 - Estados de carregamento, lista vazia, erro e recurso inexistente.
 
-Checkout, eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
+Eventos em tempo real e refinamento visual fazem parte da entrega em andamento.
 
 ## Tecnologias
 
@@ -58,12 +59,14 @@ O preview geralmente fica em `http://localhost:4173`. O Vite incorpora as variá
 
 ## Rotas
 
-| Rota                | Descrição                                                 |
-| ------------------- | --------------------------------------------------------- |
-| `/`                 | Catálogo com busca, filtros, ordenação e paginação.       |
-| `/nfts/0042`        | Detalhe do Emerald Ape #042.                              |
-| `/nfts/inexistente` | Exemplo de NFT inexistente em uma rota de detalhe válida. |
-| `/carrinho`         | Carrinho de visitante ou da conta autenticada.            |
+| Rota                     | Descrição                                                 |
+| ------------------------ | --------------------------------------------------------- |
+| `/`                      | Catálogo com busca, filtros, ordenação e paginação.       |
+| `/nfts/0042`             | Detalhe do Emerald Ape #042.                              |
+| `/nfts/inexistente`      | Exemplo de NFT inexistente em uma rota de detalhe válida. |
+| `/carrinho`              | Carrinho de visitante ou da conta autenticada.            |
+| `/pagamento`             | Revisão e pagamento do carrinho da conta autenticada.     |
+| `/pagamento?pedido=<id>` | Estado do pedido e recibo após a confirmação.             |
 
 Um exemplo de URL compartilhável do catálogo é `/?q=Golden&collection=musica&sort=price-asc`. Você pode atualizar a página ou usar o histórico do navegador para recuperar os valores aplicados.
 
@@ -138,6 +141,34 @@ Entre com uma conta de demonstração e abra **Meu perfil → Carteiras** ou ace
 - Para verificar conflito, tente cadastrar como secundária o mesmo endereço e rede da principal. O formulário preserva os dados digitados e mostra o erro no campo de endereço.
 - Recarregue a página e troque de conta para verificar a persistência e o isolamento. O cadastro armazena dados simulados de endereços públicos.
 
+## Pagamento e confirmação
+
+1. Entre com uma conta de demonstração e cadastre uma carteira em **Meu perfil → Carteiras**.
+2. Adicione um NFT ao carrinho e selecione **Conectar e finalizar**. Se estiver como visitante, entre na página de pagamento para continuar com os itens transferidos para sua conta.
+3. Confira os dados do colecionador, selecione uma carteira cadastrada e a rede correspondente, e conecte a carteira simulada.
+4. Clique em **Revisar compra** e confirme depois de conferir os itens, o desconto, a taxa e o total.
+5. O pagamento começa como pendente. O recibo aparece quando a API confirma o pedido. Recarregue a página durante o processamento ou no recibo para recuperar o mesmo pedido.
+
+O checkout aceita nome ENS e código de indicação opcionais e utiliza o endereço público e o tipo da carteira cadastrada. Os valores são expressos em ETH também na simulação com outras redes. As operações de conexão e pagamento são simuladas com MSW.
+
+### Simular falhas no pagamento
+
+No console do navegador, prepare o cenário antes da ação indicada. Por exemplo, para recusar o próximo pagamento, execute o trecho abaixo antes de confirmar a compra.
+
+```js
+localStorage.setItem('kurio:mock-checkout-scenario:v1', 'refused')
+```
+
+| Valor                | Quando preparar                   | Resultado esperado                                                                                  |
+| -------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `connection-refused` | Antes de conectar a carteira      | A conexão é recusada e você pode conectar novamente.                                                |
+| `disconnected`       | Antes de conectar ou confirmar    | A simulação informa a desconexão e pede nova conexão.                                               |
+| `quote-changed`      | Após revisar e antes de confirmar | O preço do primeiro item sobe `0,1 ETH`. A API exige uma nova revisão.                              |
+| `refused`            | Antes de confirmar                | O pedido termina recusado e o carrinho mantém os itens.                                             |
+| `timeout`            | Antes de confirmar                | A API cria o pedido e responde HTTP `504`. O reenvio com a mesma chave recupera o pedido existente. |
+
+Cada cenário é consumido uma vez. O preço alterado continua valendo até restaurar os dados simulados. O recibo usa os dados e valores gravados no pedido.
+
 ## Cenários da API simulada
 
 | Variável               | Valor   | Comportamento                                             |
@@ -187,7 +218,7 @@ VITE_MOCK_CART_EDITS=error npm run dev:mocks
 
 Para restaurar as respostas padrão, reinicie o servidor com `npm run dev:mocks`, sem as variáveis de cenário.
 
-O mock guarda a sessão, as contas cadastradas, as alterações de perfil e senha, as carteiras, os favoritos, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Execute o trecho abaixo no console do navegador para limpar esses dados e voltar às contas de demonstração originais.
+O mock guarda a sessão, as contas cadastradas, as alterações de perfil e senha, as carteiras, os favoritos, os pedidos, as linhas do carrinho e o cupom ativo no `localStorage` da origem atual. Execute o trecho abaixo no console do navegador para limpar esses dados e voltar às contas de demonstração originais.
 
 ```js
 localStorage.removeItem('kurio:guest-cart:v1')
@@ -195,12 +226,22 @@ localStorage.removeItem('kurio:carts:v1')
 localStorage.removeItem('kurio:mock-session:v1')
 localStorage.removeItem('kurio:mock-users:v1')
 localStorage.removeItem('kurio:mock-favorites-fail-next:v1')
+localStorage.removeItem('kurio:mock-checkout-scenario:v1')
 for (const key of Object.keys(localStorage)) {
   if (
     key.startsWith('kurio:favorites:v1:') ||
-    key.startsWith('kurio:wallets:v1:')
+    key.startsWith('kurio:wallets:v1:') ||
+    key.startsWith('kurio:checkout-connection:v1:')
   ) {
     localStorage.removeItem(key)
+  }
+}
+for (const key of Object.keys(sessionStorage)) {
+  if (
+    key.startsWith('kurio:checkout-attempt:v1:') ||
+    key.startsWith('kurio:checkout-draft:v1:')
+  ) {
+    sessionStorage.removeItem(key)
   }
 }
 location.reload()
@@ -210,29 +251,34 @@ O servidor de desenvolvimento e o preview usam portas diferentes. Limpe as chave
 
 ## Contratos REST atuais
 
-| Método   | Endpoint                  | Comportamento                                                                                                                                                                                                                   |
-| -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/api/nfts`               | Lista NFTs. Aceita `q`, `collection`, `network`, `minEth`, `maxEth`, `sort` e `page`. Retorna `items`, `total` e `pageSize`.                                                                                                    |
-| `GET`    | `/api/nfts/:nftId`        | Retorna o detalhe e o estoque por edição. Um ID inexistente retorna HTTP `404` com o código `NFT_NOT_FOUND`.                                                                                                                    |
-| `GET`    | `/api/cart`               | Retorna os itens e a cotação do carrinho da sessão atual, com subtotal, desconto, taxa de rede e total.                                                                                                                         |
-| `POST`   | `/api/cart/items`         | Recebe `nftId`, `editionId` e `quantity`. Soma à quantidade quando já existe uma linha para o mesmo NFT e edição.                                                                                                               |
-| `PATCH`  | `/api/cart/items/:itemId` | Recebe `{ quantity }` e define a quantidade final da linha.                                                                                                                                                                     |
-| `DELETE` | `/api/cart/items/:itemId` | Remove a linha e retorna o carrinho atualizado.                                                                                                                                                                                 |
-| `PUT`    | `/api/cart/coupon`        | Recebe `{ code }`, aplica o cupom válido e retorna o carrinho com a cotação atualizada.                                                                                                                                         |
-| `DELETE` | `/api/cart/coupon`        | Remove o cupom e retorna o carrinho com a cotação atualizada.                                                                                                                                                                   |
-| `GET`    | `/api/favorites`          | Retorna `{ items }` com os NFTs salvos pela conta autenticada.                                                                                                                                                                  |
-| `PUT`    | `/api/favorites/:nftId`   | Salva o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                  |
-| `DELETE` | `/api/favorites/:nftId`   | Remove o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                 |
-| `GET`    | `/api/wallets`            | Retorna `{ primary, secondary }` para a conta autenticada.                                                                                                                                                                      |
-| `PUT`    | `/api/wallets/principal`  | Cadastra ou substitui os dados da carteira principal e retorna as duas posições.                                                                                                                                                |
-| `PUT`    | `/api/wallets/secundaria` | Recebe `{ kind: 'independent', wallet }` ou `{ kind: 'same-as-primary' }` e retorna as duas posições.                                                                                                                           |
-| `GET`    | `/api/profile`            | Retorna os dados e o avatar da conta autenticada.                                                                                                                                                                               |
-| `PUT`    | `/api/profile`            | Atualiza dados e avatar e retorna `{ profile, user }`. Conflitos de e-mail ou nome de usuário retornam HTTP `409`.                                                                                                              |
-| `PUT`    | `/api/profile/password`   | Recebe `{ currentPassword, newPassword }` e retorna HTTP `204`. Senha incorreta ou inválida retorna HTTP `422` com mensagens por campo.                                                                                         |
-| `POST`   | `/api/auth/login`         | Recebe `{ email, password }`, transfere o carrinho de visitante para a conta e retorna a sessão. Dados inválidos retornam HTTP `400` com `INVALID_INPUT`. Credenciais incorretas retornam HTTP `401` com `INVALID_CREDENTIALS`. |
-| `POST`   | `/api/auth/register`      | Recebe `{ username, email, password }` e retorna HTTP `201` com `{ email }`. Responde com `422 VALIDATION_ERROR` ou `409 ACCOUNT_CONFLICT`, ambos com mensagens em `fields`.                                                    |
-| `GET`    | `/api/auth/session`       | Retorna a sessão atual ou `{ session: null }`. Sessão expirada retorna HTTP `401` com `SESSION_EXPIRED`.                                                                                                                        |
-| `DELETE` | `/api/auth/session`       | Encerra a sessão e retorna HTTP `204`.                                                                                                                                                                                          |
+| Método   | Endpoint                   | Comportamento                                                                                                                                                                                                                   |
+| -------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/nfts`                | Lista NFTs. Aceita `q`, `collection`, `network`, `minEth`, `maxEth`, `sort` e `page`. Retorna `items`, `total` e `pageSize`.                                                                                                    |
+| `GET`    | `/api/nfts/:nftId`         | Retorna o detalhe e o estoque por edição. Um ID inexistente retorna HTTP `404` com o código `NFT_NOT_FOUND`.                                                                                                                    |
+| `GET`    | `/api/cart`                | Retorna os itens e a cotação do carrinho da sessão atual, com subtotal, desconto, taxa de rede e total.                                                                                                                         |
+| `POST`   | `/api/cart/items`          | Recebe `nftId`, `editionId` e `quantity`. Soma à quantidade quando já existe uma linha para o mesmo NFT e edição.                                                                                                               |
+| `PATCH`  | `/api/cart/items/:itemId`  | Recebe `{ quantity }` e define a quantidade final da linha.                                                                                                                                                                     |
+| `DELETE` | `/api/cart/items/:itemId`  | Remove a linha e retorna o carrinho atualizado.                                                                                                                                                                                 |
+| `PUT`    | `/api/cart/coupon`         | Recebe `{ code }`, aplica o cupom válido e retorna o carrinho com a cotação atualizada.                                                                                                                                         |
+| `DELETE` | `/api/cart/coupon`         | Remove o cupom e retorna o carrinho com a cotação atualizada.                                                                                                                                                                   |
+| `GET`    | `/api/favorites`           | Retorna `{ items }` com os NFTs salvos pela conta autenticada.                                                                                                                                                                  |
+| `PUT`    | `/api/favorites/:nftId`    | Salva o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                  |
+| `DELETE` | `/api/favorites/:nftId`    | Remove o NFT de forma idempotente e retorna a lista atualizada.                                                                                                                                                                 |
+| `GET`    | `/api/checkout/quote`      | Retorna `{ quoteId, cart }` com a cotação vigente da conta.                                                                                                                                                                     |
+| `POST`   | `/api/checkout/connection` | Simula a conexão da carteira cadastrada na rede escolhida.                                                                                                                                                                      |
+| `DELETE` | `/api/checkout/connection` | Recebe `{ connectionId }` e encerra a conexão simulada correspondente.                                                                                                                                                          |
+| `POST`   | `/api/orders`              | Revalida a cotação, verifica a conexão e registra um pedido com `Idempotency-Key`. Retorna o pedido existente ao repetir a tentativa original.                                                                                  |
+| `GET`    | `/api/orders/:orderId`     | Recupera o estado e os dados gravados do pedido da conta.                                                                                                                                                                       |
+| `GET`    | `/api/wallets`             | Retorna `{ primary, secondary }` para a conta autenticada.                                                                                                                                                                      |
+| `PUT`    | `/api/wallets/principal`   | Cadastra ou substitui os dados da carteira principal e retorna as duas posições.                                                                                                                                                |
+| `PUT`    | `/api/wallets/secundaria`  | Recebe `{ kind: 'independent', wallet }` ou `{ kind: 'same-as-primary' }` e retorna as duas posições.                                                                                                                           |
+| `GET`    | `/api/profile`             | Retorna os dados e o avatar da conta autenticada.                                                                                                                                                                               |
+| `PUT`    | `/api/profile`             | Atualiza dados e avatar e retorna `{ profile, user }`. Conflitos de e-mail ou nome de usuário retornam HTTP `409`.                                                                                                              |
+| `PUT`    | `/api/profile/password`    | Recebe `{ currentPassword, newPassword }` e retorna HTTP `204`. Senha incorreta ou inválida retorna HTTP `422` com mensagens por campo.                                                                                         |
+| `POST`   | `/api/auth/login`          | Recebe `{ email, password }`, transfere o carrinho de visitante para a conta e retorna a sessão. Dados inválidos retornam HTTP `400` com `INVALID_INPUT`. Credenciais incorretas retornam HTTP `401` com `INVALID_CREDENTIALS`. |
+| `POST`   | `/api/auth/register`       | Recebe `{ username, email, password }` e retorna HTTP `201` com `{ email }`. Responde com `422 VALIDATION_ERROR` ou `409 ACCOUNT_CONFLICT`, ambos com mensagens em `fields`.                                                    |
+| `GET`    | `/api/auth/session`        | Retorna a sessão atual ou `{ session: null }`. Sessão expirada retorna HTTP `401` com `SESSION_EXPIRED`.                                                                                                                        |
+| `DELETE` | `/api/auth/session`        | Encerra a sessão e retorna HTTP `204`.                                                                                                                                                                                          |
 
 O mock resolve o carrinho a partir da sessão. O cliente envia `X-Cart-Scope` para indicar o carrinho que espera encontrar. Se a sessão tiver mudado, a API retorna HTTP `409` com `CART_SCOPE_CHANGED`. A fusão grava o carrinho da conta e esvazia o carrinho de visitante na mesma atualização do armazenamento. O mock ainda lê dados da chave legada `kurio:guest-cart:v1` até a primeira gravação no formato novo.
 
@@ -241,6 +287,8 @@ Os endpoints de favoritos exigem sessão válida. O mock usa a sessão para reso
 Os endpoints de perfil exigem sessão válida e usam `X-Profile-User` para recusar pedidos cujo usuário esperado difere da sessão. O mock persiste atualizações por ID e guarda apenas sal e verificador PBKDF2 para a senha.
 
 Os endpoints de carteiras exigem sessão. O mock confere `X-Wallets-User` com a conta ativa. A API responde com HTTP `422` para dados inválidos e `409` para endereço duplicado na mesma rede, sessão trocada ou referência à principal ainda indisponível.
+
+Checkout e pedidos exigem sessão válida. Pedidos recebem uma chave por tentativa. Repetir a chave com o mesmo conteúdo recupera o pedido original e reutilizá-la com outros dados retorna HTTP `409`. Quando o preço, a taxa, o desconto ou a disponibilidade mudam, a cotação é revalidada antes de criar o pedido. Uma confirmação remove do carrinho somente as quantidades compradas. A recusa mantém o carrinho.
 
 Cada linha do carrinho representa um par de NFT e edição. O mock persiste os IDs, as quantidades e o código aplicado e consulta as fixtures para montar os preços e o estoque. A cotação é recalculada quando a quantidade, os itens ou o cupom mudam. As quantidades são inteiras. Os valores em ETH trafegam como strings decimais, e os cálculos de preço usam `BigInt` em wei.
 
@@ -252,6 +300,7 @@ src/
     auth/       Cliente REST de sessão, cabeçalho e diálogo de login
     catalog/    Contratos, filtros e tela de detalhe
     cart/       Contrato e tela do carrinho
+    checkout/   Revisão, envio do pedido e recibo
   lib/          Cliente Axios e conversões de ETH
   mocks/        Handlers REST e fixtures
   routes/       Rotas do TanStack Router
@@ -270,6 +319,8 @@ Favoritos usam `['favorites', userId]`. O botão mostra a inclusão ou remoção
 O perfil usa `['profile', userId]`. Ao salvar, o cache recebe o perfil confirmado e o nome e o e-mail são atualizados na sessão. Na troca de conta, o cache do perfil anterior é removido.
 
 As carteiras usam `['wallets', userId]`. A API retorna o estado completo após salvar. Na troca de conta, as consultas e mutations do usuário anterior saem do cache.
+
+O checkout usa chaves com o ID da conta. A tela consulta o estado de um pedido pendente pela API REST e atualiza o cache do carrinho após a confirmação. O rascunho de pagamento e a tentativa ainda em andamento ficam associados à conta em `sessionStorage` para retomar o fluxo na mesma aba.
 
 A sessão usa a chave `['session']`. Na troca de carrinho, as queries e mutations em cache do carrinho anterior são removidas. Após login ou logout, as consultas de sessão pendentes são canceladas e o cache recebe o estado confirmado pela API.
 
@@ -313,6 +364,12 @@ Para verificar as carteiras, execute a suíte de validação, persistência e is
 
 ```bash
 npm run test:e2e -- wallets.spec.ts
+```
+
+Para verificar a revisão da compra, a confirmação e as falhas de pagamento, execute os testes de checkout.
+
+```bash
+npm run test:e2e -- checkout.spec.ts
 ```
 
 Abra o relatório HTML com:

@@ -1,7 +1,7 @@
 import { delay, http, HttpResponse } from 'msw'
 import type { FavoritesResponse } from '@/features/favorites/favorites-api'
 import { getMockUserId } from './auth-handlers'
-import { nfts } from './fixtures/nfts'
+import { readCatalog } from './catalog-state'
 
 const storageKey = 'kurio:favorites:v1'
 const failNextKey = 'kurio:mock-favorites-fail-next:v1'
@@ -22,7 +22,7 @@ function readFavorites(userId: string): string[] {
 function favoriteResponse(ids: string[]) {
   const savedIds = new Set(ids)
   return HttpResponse.json<FavoritesResponse>({
-    items: nfts.filter((nft) => savedIds.has(nft.id)),
+    items: readCatalog().nfts.filter((nft) => savedIds.has(nft.id)),
   })
 }
 
@@ -48,7 +48,10 @@ function withFavorites(request: Request, run: (userId: string) => Response) {
 
 function updateFavorites(request: Request, nftId: unknown, saved: boolean) {
   return withFavorites(request, (userId) => {
-    if (typeof nftId !== 'string' || !nfts.some((nft) => nft.id === nftId)) {
+    if (
+      typeof nftId !== 'string' ||
+      !readCatalog().nfts.some((nft) => nft.id === nftId)
+    ) {
       return HttpResponse.json({ code: 'NFT_NOT_FOUND' }, { status: 404 })
     }
 

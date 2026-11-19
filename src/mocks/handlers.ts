@@ -4,13 +4,14 @@ import {
   catalogOptions,
   parseCatalogSearch,
 } from '@/features/catalog/catalog-search'
-import { nfts, nftEditions } from './fixtures/nfts'
+import { readCatalog } from './catalog-state'
 import { toWei } from '@/lib/eth'
 import { cartHandlers } from './cart-handlers'
 import { authHandlers } from './auth-handlers'
 import { favoritesHandlers } from './favorites-handlers'
 import { profileHandlers } from './profile-handlers'
 import { walletHandlers } from './wallet-handlers'
+import { checkoutHandlers } from './checkout-handlers'
 
 const PAGE_SIZE = 3
 
@@ -36,7 +37,7 @@ export const handlers = [
     const matches =
       scenario === 'empty'
         ? []
-        : nfts.filter((nft) => {
+        : readCatalog().nfts.filter((nft) => {
             const price = toWei(nft.priceEth)
 
             return (
@@ -79,7 +80,8 @@ export const handlers = [
       )
     }
 
-    const nft = nfts.find((item) => item.id === params.nftId)
+    const catalog = readCatalog()
+    const nft = catalog.nfts.find((item) => item.id === params.nftId)
 
     if (!nft) {
       return HttpResponse.json({ code: 'NFT_NOT_FOUND' }, { status: 404 })
@@ -108,7 +110,7 @@ export const handlers = [
         royalties:
           'O criador recebe 5% de direitos autorais nas vendas secundárias.',
       },
-      editions: nftEditions,
+      editions: catalog.editionsFor(nft.id),
     })
   }),
   ...cartHandlers,
@@ -116,4 +118,5 @@ export const handlers = [
   ...favoritesHandlers,
   ...profileHandlers,
   ...walletHandlers,
+  ...checkoutHandlers,
 ]

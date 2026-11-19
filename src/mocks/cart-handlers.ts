@@ -5,7 +5,7 @@ import type {
   CartSelection,
 } from '@/features/cart/cart-api'
 import { fromWei, toWei } from '@/lib/eth'
-import { nftEditions, nfts } from './fixtures/nfts'
+import { readCatalog } from './catalog-state'
 import { getMockCartScope } from './auth-handlers'
 import {
   cartStorageLock,
@@ -41,12 +41,18 @@ function isCouponExpired(coupon: Coupon, now: number): boolean {
   return coupon.expiresAt !== null && now >= coupon.expiresAt
 }
 
-function buildCart(state: CartState, now = Date.now()): CartResponse {
+export function buildCart(
+  state: CartState,
+  now = Date.now(),
+  catalog = readCatalog(),
+): CartResponse {
   let subtotal = 0n
 
   const items = state.selections.flatMap((selection) => {
-    const nft = nfts.find((item) => item.id === selection.nftId)
-    const edition = nftEditions.find((item) => item.id === selection.editionId)
+    const nft = catalog.nfts.find((item) => item.id === selection.nftId)
+    const edition = catalog
+      .editionsFor(selection.nftId)
+      .find((item) => item.id === selection.editionId)
 
     if (!nft || !edition) return []
 
@@ -155,8 +161,11 @@ export const cartHandlers = [
       )
     }
 
-    const nft = nfts.find((item) => item.id === input.nftId)
-    const edition = nftEditions.find((item) => item.id === input.editionId)
+    const catalog = readCatalog()
+    const nft = catalog.nfts.find((item) => item.id === input.nftId)
+    const edition = catalog
+      .editionsFor(input.nftId)
+      .find((item) => item.id === input.editionId)
 
     if (!nft || !edition) {
       return HttpResponse.json(
@@ -213,9 +222,11 @@ export const cartHandlers = [
       const item = selections.find(
         (selection) => cartItemId(selection) === params.itemId,
       )
-      const edition = nftEditions.find(
-        (candidate) => candidate.id === item?.editionId,
-      )
+      const edition =
+        item &&
+        readCatalog()
+          .editionsFor(item.nftId)
+          .find((candidate) => candidate.id === item.editionId)
 
       if (!item || !edition) {
         return HttpResponse.json(

@@ -12,10 +12,10 @@ import { cartStorageLock } from './cart-store'
 const storagePrefix = 'kurio:wallets:v1:'
 const base58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 
-function readWallets(key: string): Wallets {
+export function readWallets(userId: string): Wallets {
   try {
     const data = JSON.parse(
-      localStorage.getItem(key) ?? 'null',
+      localStorage.getItem(`${storagePrefix}${userId}`) ?? 'null',
     ) as Partial<Wallets> | null
     return {
       primary: data?.primary ?? null,
@@ -44,7 +44,7 @@ function withWallets(
     }
 
     const key = `${storagePrefix}${userId}`
-    return run(key, readWallets(key))
+    return run(key, readWallets(userId))
   })
 }
 
